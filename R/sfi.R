@@ -1,9 +1,3 @@
-# Load necessary libraries
-library(proxy)
-library(enviGCMS)
-library(stats)
-library(Rcpp)
-
 #' Cluster and Pair m/z and Retention Time Features
 #'
 #' This function clusters m/z values based on Manhattan distance and pairs features within clusters.
@@ -16,7 +10,11 @@ library(Rcpp)
 #'
 #' @return A data frame containing paired m/z and retention time values with their differences.
 #' @export
-getsff <- function(mz, rt, ppm = 5, minn = 2, refmz = NULL) {
+getsff <- function(mz,
+                   rt,
+                   ppm = 5,
+                   minn = 2,
+                   refmz = NULL) {
   # Calculate Manhattan distance matrix for m/z values
   dis <- proxy::dist(mz, method = "manhattan")
 
@@ -121,9 +119,7 @@ getwindow <- function(mz,
   sff <- getsff(mz_filtered, rt_filtered, ppm = ppm, minn = minn)
 
   # Determine the most frequent rounded pmr values corresponding to QC samples
-  rtc <- as.numeric(names(table(round(sff$pmr, 2)))[
-    order(table(round(sff$pmr, 2)), decreasing = TRUE)
-  ])[1:length(qcseq)]
+  rtc <- as.numeric(names(table(round(sff$pmr, 2)))[order(table(round(sff$pmr, 2)), decreasing = TRUE)])[seq_along(qcseq)]
 
   # Filter rtc within specified window bounds
   rtcx <- rtc[rtc < upper & rtc > lower]
@@ -198,11 +194,19 @@ getidelta <- function(mz,
   evaluate_idelta <- function(current_idelta, irt, n, deltart) {
     sampleidx <- round(irt / current_idelta)
     shiftrt <- rt - window - sampleidx * current_idelta - rtqc
-    sum(abs(shiftrt) < deltart & sampleidx %in% seq_len(n), na.rm = TRUE)
+    sum(abs(shiftrt) < deltart &
+          sampleidx %in% seq_len(n), na.rm = TRUE)
   }
 
   # Binary search optimization to find the best idelta
-  binary_search_optimization <- function(f, lower, upper, irt, n, deltart, tol = 0.01, max_iter = 100) {
+  binary_search_optimization <- function(f,
+                                         lower,
+                                         upper,
+                                         irt,
+                                         n,
+                                         deltart,
+                                         tol = 0.01,
+                                         max_iter = 100) {
     iter <- 0
     converged <- FALSE
 
@@ -331,7 +335,12 @@ getqc <- function(mz,
   mtx <- dfm[yyy, ]
 
   # Align QC features
-  t_qc <- enviGCMS::getalign(qcx$mz, dfqc$mz, qcx$rt, dfqc$rt, ppm = ppm, deltart = deltart)
+  t_qc <- enviGCMS::getalign(qcx$mz,
+                             dfqc$mz,
+                             qcx$rt,
+                             dfqc$rt,
+                             ppm = ppm,
+                             deltart = deltart)
   t_qc$idx <- paste(t_qc$mz1, t_qc$rt1)
   t_qc$idx2 <- paste(t_qc$mz2, t_qc$rt2)
   dfqc$idx <- paste(dfqc$mz, dfqc$rt)
@@ -341,11 +350,21 @@ getqc <- function(mz,
   dfqct$idxq <- paste(dfqct$mzqc, dfqct$rtqc)
 
   # Filter QC features based on minimum sample index occurrences
-  z_qc <- stats::aggregate(dfqct$sampleidx, by = list(dfqct$idxq), FUN = function(x) length(table(x)) >= minn)
+  z_qc <- stats::aggregate(
+    dfqct$sampleidx,
+    by = list(dfqct$idxq),
+    FUN = function(x)
+      length(table(x)) >= minn
+  )
   dfqct2 <- dfqct[dfqct$idxq %in% z_qc$Group.1[z_qc$x], ]
 
   # Align matrix features
-  t_mtx <- enviGCMS::getalign(mtx$mz, dfm$mz, mtx$rt, dfm$rt, ppm = ppm, deltart = deltart)
+  t_mtx <- enviGCMS::getalign(mtx$mz,
+                              dfm$mz,
+                              mtx$rt,
+                              dfm$rt,
+                              ppm = ppm,
+                              deltart = deltart)
   t_mtx$idx <- paste(t_mtx$mz1, t_mtx$rt1)
   t_mtx$idx2 <- paste(t_mtx$mz2, t_mtx$rt2)
   dfm$idx <- paste(dfm$mz, dfm$rt)
@@ -355,11 +374,21 @@ getqc <- function(mz,
   dfmt$idxq <- paste(dfmt$mzqc, dfmt$rtqc)
 
   # Filter matrix features based on minimum QC sample index occurrences
-  z_mtx <- stats::aggregate(dfmt$sampleidx, by = list(dfmt$idxq), FUN = function(x) length(table(x)) >= sum(qcseq == 0))
+  z_mtx <- stats::aggregate(
+    dfmt$sampleidx,
+    by = list(dfmt$idxq),
+    FUN = function(x)
+      length(table(x)) >= sum(qcseq == 0)
+  )
   dfmt2 <- dfmt[dfmt$idxq %in% z_mtx$Group.1[z_mtx$x], ]
 
   # Align QC and matrix data frames to identify duplicates
-  re <- enviGCMS::getalign(dfqct2$mz, dfmt2$mz, dfqct2$rt, dfmt2$rt, ppm = ppm, deltart = deltart)
+  re <- enviGCMS::getalign(dfqct2$mz,
+                           dfmt2$mz,
+                           dfqct2$rt,
+                           dfmt2$rt,
+                           ppm = ppm,
+                           deltart = deltart)
 
   # Extract QC features that are not aligned with matrix features
   qc <- dfqct2[-re$xid, c('mzqc', 'rtqc', 'sampleidx', 'idxq')]
@@ -441,7 +470,12 @@ getqcdf <- function(mz,
   mtx <- dfm[yyy, ]
 
   # Align QC features
-  t_qc <- enviGCMS::getalign(qcx$mz, dfqc$mz, qcx$rt, dfqc$rt, ppm = ppm, deltart = deltart)
+  t_qc <- enviGCMS::getalign(qcx$mz,
+                             dfqc$mz,
+                             qcx$rt,
+                             dfqc$rt,
+                             ppm = ppm,
+                             deltart = deltart)
   t_qc$idx <- paste(t_qc$mz1, t_qc$rt1)
   t_qc$idx2 <- paste(t_qc$mz2, t_qc$rt2)
   dfqc$idx <- paste(dfqc$mz, dfqc$rt)
@@ -451,11 +485,21 @@ getqcdf <- function(mz,
   dfqct$idxq <- paste(dfqct$mzqc, dfqct$rtqc)
 
   # Filter QC features based on minimum occurrences
-  z_qc <- stats::aggregate(dfqct$sampleidx, by = list(dfqct$idxq), FUN = function(x) length(table(x)) >= minn)
+  z_qc <- stats::aggregate(
+    dfqct$sampleidx,
+    by = list(dfqct$idxq),
+    FUN = function(x)
+      length(table(x)) >= minn
+  )
   dfqct2 <- dfqct[dfqct$idxq %in% z_qc$Group.1[z_qc$x], ]
 
   # Align matrix features
-  t_mtx <- enviGCMS::getalign(mtx$mz, dfm$mz, mtx$rt, dfm$rt, ppm = ppm, deltart = deltart)
+  t_mtx <- enviGCMS::getalign(mtx$mz,
+                              dfm$mz,
+                              mtx$rt,
+                              dfm$rt,
+                              ppm = ppm,
+                              deltart = deltart)
   t_mtx$idx <- paste(t_mtx$mz1, t_mtx$rt1)
   t_mtx$idx2 <- paste(t_mtx$mz2, t_mtx$rt2)
   dfm$idx <- paste(dfm$mz, dfm$rt)
@@ -465,11 +509,21 @@ getqcdf <- function(mz,
   dfmt$idxq <- paste(dfmt$mzqc, dfmt$rtqc)
 
   # Filter matrix features based on minimum QC sample index occurrences
-  z_mtx <- stats::aggregate(dfmt$sampleidx, by = list(dfmt$idxq), FUN = function(x) length(table(x)) >= sum(qcseq == 0))
+  z_mtx <- stats::aggregate(
+    dfmt$sampleidx,
+    by = list(dfmt$idxq),
+    FUN = function(x)
+      length(table(x)) >= sum(qcseq == 0)
+  )
   dfmt2 <- dfmt[dfmt$idxq %in% z_mtx$Group.1[z_mtx$x], ]
 
   # Align QC and matrix data frames to identify duplicates
-  re <- enviGCMS::getalign(dfqct2$mz, dfmt2$mz, dfqct2$rt, dfmt2$rt, ppm = ppm, deltart = deltart)
+  re <- enviGCMS::getalign(dfqct2$mz,
+                           dfmt2$mz,
+                           dfqct2$rt,
+                           dfmt2$rt,
+                           ppm = ppm,
+                           deltart = deltart)
 
   # Extract QC features that are not aligned with matrix features
   qc <- dfqct2[-re$xid, c('mzqc', 'rtqc', 'intensity', 'sampleidx', 'idxq')]
@@ -538,7 +592,12 @@ getsfm <- function(mz,
   mtx <- dfm[yyy, ]
 
   # Align QC features
-  t_qc <- enviGCMS::getalign(qcx$mz, dfqc$mz, qcx$rt, dfqc$rt, ppm = ppm, deltart = deltart)
+  t_qc <- enviGCMS::getalign(qcx$mz,
+                             dfqc$mz,
+                             qcx$rt,
+                             dfqc$rt,
+                             ppm = ppm,
+                             deltart = deltart)
   t_qc$idx <- paste(t_qc$mz1, t_qc$rt1)
   t_qc$idx2 <- paste(t_qc$mz2, t_qc$rt2)
   dfqc$idx <- paste(dfqc$mz, dfqc$rt)
@@ -548,11 +607,21 @@ getsfm <- function(mz,
   dfqct$idxq <- paste(dfqct$mzqc, dfqct$rtqc)
 
   # Filter QC features based on minimum occurrences
-  z_qc <- stats::aggregate(dfqct$sampleidx, by = list(dfqct$idxq), FUN = function(x) length(table(x)) >= minn)
+  z_qc <- stats::aggregate(
+    dfqct$sampleidx,
+    by = list(dfqct$idxq),
+    FUN = function(x)
+      length(table(x)) >= minn
+  )
   dfqct2 <- dfqct[dfqct$idxq %in% z_qc$Group.1[z_qc$x], ]
 
   # Align matrix features
-  t_mtx <- enviGCMS::getalign(mtx$mz, dfm$mz, mtx$rt, dfm$rt, ppm = ppm, deltart = deltart)
+  t_mtx <- enviGCMS::getalign(mtx$mz,
+                              dfm$mz,
+                              mtx$rt,
+                              dfm$rt,
+                              ppm = ppm,
+                              deltart = deltart)
   t_mtx$idx <- paste(t_mtx$mz1, t_mtx$rt1)
   t_mtx$idx2 <- paste(t_mtx$mz2, t_mtx$rt2)
   dfm$idx <- paste(dfm$mz, dfm$rt)
@@ -562,11 +631,21 @@ getsfm <- function(mz,
   dfmt$idxq <- paste(dfmt$mzqc, dfmt$rtqc)
 
   # Filter matrix features based on minimum QC sample index occurrences
-  z_mtx <- stats::aggregate(dfmt$sampleidx, by = list(dfmt$idxq), FUN = function(x) length(table(x)) >= sum(qcseq == 0))
+  z_mtx <- stats::aggregate(
+    dfmt$sampleidx,
+    by = list(dfmt$idxq),
+    FUN = function(x)
+      length(table(x)) >= sum(qcseq == 0)
+  )
   dfmt2 <- dfmt[dfmt$idxq %in% z_mtx$Group.1[z_mtx$x], ]
 
   # Align QC and matrix data frames to identify duplicates
-  re <- enviGCMS::getalign(dfqct2$mz, dfmt2$mz, dfqct2$rt, dfmt2$rt, ppm = ppm, deltart = deltart)
+  re <- enviGCMS::getalign(dfqct2$mz,
+                           dfmt2$mz,
+                           dfqct2$rt,
+                           dfmt2$rt,
+                           ppm = ppm,
+                           deltart = deltart)
 
   # Extract QC features that are not aligned with matrix features
   qc <- dfqct2[-re$xid, c('mzqc', 'rtqc', 'intensity', 'sampleidx', 'idxq')]
@@ -605,7 +684,12 @@ getsfm <- function(mz,
     dfi <- dfj
 
     # Align sample with QC
-    merge_qc <- enviGCMS::getalign(mzi, qc$mzqc, srt, qc$rtqc, ppm = ppm, deltart = deltart)
+    merge_qc <- enviGCMS::getalign(mzi,
+                                   qc$mzqc,
+                                   srt,
+                                   qc$rtqc,
+                                   ppm = ppm,
+                                   deltart = deltart)
     dfi <- dfi[unique(merge_qc$xid), ]
     dfi$qcmz <- merge_qc$mz2[!duplicated(merge_qc$xid)]
     dfi$qcrt <- merge_qc$rt2[!duplicated(merge_qc$xid)]
@@ -613,7 +697,12 @@ getsfm <- function(mz,
     ndf <- rbind(ndf, dfi)
 
     # Align sample with matrix
-    merge_mtx <- enviGCMS::getalign(mzi, dfmt2$mzqc, srt, dfmt2$rtqc, ppm = ppm, deltart = deltart)
+    merge_mtx <- enviGCMS::getalign(mzi,
+                                    dfmt2$mzqc,
+                                    srt,
+                                    dfmt2$rtqc,
+                                    ppm = ppm,
+                                    deltart = deltart)
     dfj <- dfj[unique(merge_mtx$xid), ]
     dfj$mtmz <- merge_mtx$mz2[!duplicated(merge_mtx$xid)]
     dfj$mtrt <- merge_mtx$rt2[!duplicated(merge_mtx$xid)]
@@ -629,8 +718,10 @@ getsfm <- function(mz,
   mdf$ppmshift <- abs(mdf$mtmz - mdf$mz) / mdf$mtmz * 1e6
 
   # Calculate duplicate peaks
-  nn <- sum(duplicated(paste(ndf$mz, ndf$rt)) | duplicated(paste(ndf$mz, ndf$rt), fromLast = TRUE))
-  nnn <- sum(duplicated(paste(mdf$mz, mdf$rt)) | duplicated(paste(mdf$mz, mdf$rt), fromLast = TRUE))
+  nn <- sum(duplicated(paste(ndf$mz, ndf$rt)) |
+              duplicated(paste(ndf$mz, ndf$rt), fromLast = TRUE))
+  nnn <- sum(duplicated(paste(mdf$mz, mdf$rt)) |
+               duplicated(paste(mdf$mz, mdf$rt), fromLast = TRUE))
 
   # Calculate unique peaks
   xx <- length(unique(paste(ndf$qcmz, ndf$qcrt)))
@@ -666,13 +757,14 @@ getsfm <- function(mz,
 #'
 #' @return A data frame containing the aligned and filtered Quality Control Matrix.
 #' @export
-find_2d_peaks <- function(mz, rt, intensity,
+find_2d_peaks <- function(mz,
+                          rt,
+                          intensity,
                           ppm = 5,
                           deltart = 5,
                           snr = 3.0,
                           mz_bins = 50000,
                           rt_bins = 100) {
-
   if (!is.numeric(mz) || !is.numeric(rt) || !is.numeric(intensity)) {
     stop("All inputs must be numeric vectors")
   }
@@ -680,6 +772,14 @@ find_2d_peaks <- function(mz, rt, intensity,
     stop("All input vectors must have the same length")
   }
 
-  find_2d_peaks_c(mz, rt, intensity,
-                  mz_ppm=ppm, rt_window=deltart, snr_threshold = snr,mz_bins = mz_bins,rt_bins = rt_bins)
+  find_2d_peaks_c(
+    mz,
+    rt,
+    intensity,
+    mz_ppm = ppm,
+    rt_window = deltart,
+    snr_threshold = snr,
+    mz_bins = mz_bins,
+    rt_bins = rt_bins
+  )
 }

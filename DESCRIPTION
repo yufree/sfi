@@ -1,22 +1,30 @@
 Package: sfi
 Type: Package
 Title: Single File Injections (sfi) for high throughput LC/GC-MS analysis
-Version: 0.1.0
+Version: 0.99.0
 Authors@R: person(given = "Miao", family = "YU",
         role = c("aut", "cre"), 
         email = "yufreecas@gmail.com",
         comment = c(ORCID = "0000-0002-2804-6014"))
 Description: Data analysis for sfi.
+URL: https://github.com/yufree/sfi
+BugReports: https://github.com/yufree/sfi/issues/new
 License: MIT + file LICENSE
-Encoding: UTF-8
-LazyData: true
-RoxygenNote: 7.3.2
 Depends: 
-    R (>= 3.5)
+    R (>= 4.5.0)
 LinkingTo: 
     Rcpp
 Imports: 
     Rcpp,
     proxy,
     enviGCMS,
-    stats
+    stats,
+    mzR
+Suggests: 
+    knitr,
+    rmarkdown,
+    data.table
+VignetteBuilder: knitr
+biocViews: MassSpectrometry, Metabolomics
+Encoding: UTF-8
+RoxygenNote: 7.3.2

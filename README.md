@@ -2,7 +2,19 @@
 
 ## Introduction
 
-The `sfi` package provides features extraction tools for single file injections(sfi) mode Gas/liquid chromatography-mass spectrometry (GC/LC-MS) data. 
+The `sfi` package provides features extraction tools for single file injections(sfi) mode Gas/liquid chromatography-mass spectrometry (GC/LC-MS) data. The SFI technique enables the analysis of numerous samples (e.g., up to 1000 per day) by acquiring data from multiple injections within a single analytical run, significantly reducing the time compared to traditional serial LC-MS injections.
+
+## Experimental Desgin
+
+The SFI method (see demo figure) operates by:
+
+- Injecting a pooled sample multiple times initially to establish reference chromatographic profiles.
+
+- Subsequently injecting individual samples repeatedly at fixed, short time intervals under a continuous isocratic elution. Each sample undergoes a fixed chromatographic separation.
+
+- This process generates a single, continuous data file containing the interleaved data from all injected samples.
+
+![DemoFigure](https://github.com/yufree/presentation/blob/gh-pages/figure/SFI.png?raw=true)
 
 ## Installation
 
@@ -23,6 +35,8 @@ library(sfi)
 ```
 
 ### Loading raw data
+
+You need to convert the raw data into mzML file. You might try [ThermoFlask](https://github.com/yufree/thermoflask) for Thermo data or [ProteoWizard](https://proteowizard.sourceforge.io/download.html) for other vendor file.
 
 ```
 library(mzR)

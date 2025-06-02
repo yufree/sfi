@@ -2,7 +2,7 @@
 
 ## Introduction
 
-The `sfi` package provides features extraction tools for single file injections(sfi) mode Gas/liquid chromatography-mass spectrometry (GC/LC-MS) data. The SFI technique enables the analysis of numerous samples (e.g., up to 1000 per day) by acquiring data from multiple injections within a single analytical run, significantly reducing the time compared to traditional serial LC-MS injections.
+The `sfi` package provides features extraction tools for single file injections(sfi) mode liquid chromatography-mass spectrometry (LC-MS) data. The SFI technique enables the analysis of numerous samples (e.g., up to 1000 per day) by acquiring data from multiple injections within a single analytical run, significantly reducing the time compared to traditional serial LC-MS injections.
 
 ## Experimental Desgin
 

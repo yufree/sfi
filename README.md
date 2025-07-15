@@ -36,25 +36,16 @@ library(sfi)
 
 ### Loading raw data
 
-You need to convert the raw data into mzML file. You might try [ThermoFlask](https://github.com/yufree/thermoflask) for Thermo data or [ProteoWizard](https://proteowizard.sourceforge.io/download.html) for other vendor file.
+You need to convert the raw data into mzML file. You might try [ThermoFlask](https://github.com/yufree/thermoflask) for Thermo data or [ProteoWizard](https://proteowizard.sourceforge.io/download.html) for other vendor file. `getmzml` function will load the mzML file and return a matrix object for peak picking.
 
 ```
-library(mzR)
 path <- 'sfi.mzML'
-mzml_file <- openMSfile(path)
+peak <- getmzml(path)
 ```
 
 ### Feature extraction
 
 ```
-# read meta data
-tt <- header(mzml_file)
-# generate retention time vector
-rt <- rep(tt$retentionTime,tt$peaksCount)
-# extract peaks
-peaks <- peaks(mzml_file)
-peak <- do.call(rbind,peaks)
-peak <- cbind(peak,rt)
 # perform peaks picking
 peaklist <- find_2d_peaks(peak[,1],peak[,3],peak[,2],rt_window = 30,mz_bins = 40000,rt_bins = 2000)
 ```

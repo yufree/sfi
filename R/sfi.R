@@ -1,3 +1,19 @@
+#' Read mzML File and Extract m/z, Retention Time, and Intensity
+#' @param path path of SFI mzML file.
+#' @return A matrix containing m/z, retention time and intensity.
+#' @export
+getmzml <- function(path) {
+  mzml_file <- mzR::openMSfile(path)
+  # read meta data
+  tt <- mzR::header(mzml_file)
+  # generate retention time vector
+  rt <- rep(tt$retentionTime,tt$peaksCount)
+  # extract peaks
+  peaks <- mzR::peaks(mzml_file)
+  peak <- do.call(rbind,peaks)
+  peak <- cbind(peak,rt)
+  return(peak)
+}
 #' Cluster and Pair m/z and Retention Time Features
 #'
 #' This function clusters m/z values based on Manhattan distance and pairs features within clusters.

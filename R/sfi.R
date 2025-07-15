@@ -1,3 +1,6 @@
+#' @useDynLib sfi, .registration = TRUE
+#' @importFrom Rcpp evalCpp
+NULL
 #' Read mzML File and Extract m/z, Retention Time, and Intensity
 #' @param path path of SFI mzML file.
 #' @return A matrix containing m/z, retention time and intensity.

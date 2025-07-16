@@ -44,3 +44,8 @@ A data frame containing the aligned and filtered Quality Control Matrix.
 \description{
 This function generates a Quality Control Matrix by aligning and filtering sample and matrix peaks.
 }
+\examples{
+data(sfi)
+peak <- find_2d_peaks(mz=sfi$mz,rt=sfi$rt,intensity=sfi$intensity)
+peaklist <- getsfm(peak$mz, peak$rt, peak$intensity,idelta=92,windows=632,minn=6,n=158,deltart=10)
+}

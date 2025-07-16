@@ -15,3 +15,9 @@ A matrix containing m/z, retention time and intensity.
 \description{
 Read mzML File and Extract m/z, Retention Time, and Intensity
 }
+\examples{
+\donttest{
+path <- 'sfi.mzML'
+peak <- getmzml(path)
+}
+}

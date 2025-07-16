@@ -45,9 +45,12 @@ peak <- getmzml(path)
 
 ### Feature extraction
 
+You could use demo data in the package.
 ```
+# load demo data
+data(sfi)
 # perform peaks picking
-peaklist <- find_2d_peaks(peak[,1],peak[,3],peak[,2],rt_window = 30,mz_bins = 40000,rt_bins = 2000)
+peaklist <-  find_2d_peaks(mz=sfi$mz,rt=sfi$rt,intensity=sfi$intensity)
 ```
 
 ## Feature alignment
@@ -60,7 +63,7 @@ rt <- peaklist$rt
 intensity <- peaklist$intensity
 # injection interval
 idelta <- 80
-# time windows for a full seperation
+# time windows for a full separation
 windows <- 900
 # sample numbers in the files
 n <- 100

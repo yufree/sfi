@@ -38,3 +38,7 @@ A data frame containing the aligned and filtered Quality Control Matrix.
 \description{
 This function finds local max peaks on m/z-retention time 2D plane.
 }
+\examples{
+data(sfi)
+peak <- find_2d_peaks(mz=sfi$mz,rt=sfi$rt,intensity=sfi$intensity)
+}

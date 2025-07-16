@@ -35,3 +35,8 @@ Numeric value representing the optimal retention time window.
 \description{
 This function calculates the optimal retention time window based on QC sequences and m/z/rt data.
 }
+\examples{
+data(sfi)
+peak <- find_2d_peaks(mz=sfi$mz,rt=sfi$rt,intensity=sfi$intensity)
+peaklist <- getwindow(peak$mz, peak$rt)
+}

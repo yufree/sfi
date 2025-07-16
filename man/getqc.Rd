@@ -56,3 +56,8 @@ A numeric vector containing the optimal window and delta retention time.
 \description{
 This function performs quality control (QC) on mass spectrometry data by aligning QC and sample features.
 }
+\examples{
+data(sfi)
+peak <- find_2d_peaks(mz=sfi$mz,rt=sfi$rt,intensity=sfi$intensity)
+peaklist <- getqc(peak$mz, peak$rt, ,deltart=10)
+}

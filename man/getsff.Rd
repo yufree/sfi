@@ -23,3 +23,8 @@ A data frame containing paired m/z and retention time values with their differen
 \description{
 This function clusters m/z values based on Manhattan distance and pairs features within clusters.
 }
+\examples{
+data(sfi)
+peak <- find_2d_peaks(mz=sfi$mz,rt=sfi$rt,intensity=sfi$intensity)
+peaklist <- getsff(peak$mz, peak$rt)
+}

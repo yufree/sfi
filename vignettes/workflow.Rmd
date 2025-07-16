@@ -41,30 +41,31 @@ The SFI method (see demo figure) operates by:
 You need to convert the raw data into mzML file. You might try [ThermoFlask](https://github.com/yufree/thermoflask) for Thermo data or [ProteoWizard](https://proteowizard.sourceforge.io/download.html) for other vendor file.
 
 ```{r eval=FALSE}
-library(mzR)
 path <- 'sfi.mzML'
 peak <- getmzml(path)
 ```
 
 ### Feature extraction
 
-```{r eval=FALSE}
+```{r}
+# load demo data
+data(sfi)
 # perform peaks picking
-peaklist <- find_2d_peaks(peak[,1],peak[,3],peak[,2],rt_window = 30,mz_bins = 40000,rt_bins = 2000)
+peaklist <-  find_2d_peaks(mz=sfi$mz,rt=sfi$rt,intensity=sfi$intensity)
 ```
 
 ### Feature alignment
 
 The `getsfm()` function will extract sample features from one injections file.
 
-```{r eval=FALSE}
+```{r}
 mz <- peaklist$mz
 rt <- peaklist$rt
 intensity <- peaklist$intensity
 # injection interval
-idelta <- 80
-# time windows for a full seperation
-windows <- 900
+idelta <- 92
+# time windows for a full separation
+windows <- 632
 # sample numbers in the files
 n <- 100
 # retention time shift in seconds
@@ -93,9 +94,9 @@ fwrite(feature,'featurelist.csv')
 
 In real data, you might find the input window for separation and injection interval are not accurate due to the lag in sample injection process. It's suggested to filter high intensity peaks and use `getqc` to find the accurate value for accurate instrumental window for separation and injection interval.
 
-```{r eval=FALSE}
+```{r}
 # get windows and delta time
-sfmsub <- peaklist[peaklist$intensity>1e7,]
+sfmsub <- peaklist[peaklist$intensity>1e4,]
 mz <- sfmsub$mz
 rt <- sfmsub$rt
 # get windows and delta time
@@ -104,13 +105,13 @@ ndf <- getqc(mz,rt,n=158,deltart = 5)
 
 Then you can use those parameters for all data.
 
-```{r eval=FALSE}
+```{r}
 mz <- peaklist$mz
 rt <- peaklist$rt
 intensity <- peaklist$intensity
 windows <- ndf[1]
 idelta <- ndf[2]
-ndf <- getsfm(mz,rt,intensity,idelta=idelta,windows=windows,n=100,deltart = 10,minn = 6)
+ndf <- getsfm(mz,rt,intensity,idelta=idelta,windows=windows,n=158,deltart = 10,minn = 6)
 ```
 
 ```{r}

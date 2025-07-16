@@ -50,3 +50,8 @@ Optimized delta retention time (idelta).
 \description{
 This function optimizes the delta retention time (idelta) using a binary search approach.
 }
+\examples{
+data(sfi)
+peak <- find_2d_peaks(mz=sfi$mz,rt=sfi$rt,intensity=sfi$intensity)
+peaklist2 <- getidelta(peak$mz, peak$rt,qcmz=195.0876,qcrt=74,window=632,idelta=90)
+}

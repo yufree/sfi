@@ -1,20 +1,30 @@
 #' @useDynLib sfi, .registration = TRUE
 #' @importFrom Rcpp evalCpp
 NULL
+#' Demo sfi data
+#' @docType data
+#' @usage data(sfi)
+#' @format A data.frame object with mass to charge ratio, intensity and retention time from sfi mode.
+"sfi"
 #' Read mzML File and Extract m/z, Retention Time, and Intensity
 #' @param path path of SFI mzML file.
 #' @return A matrix containing m/z, retention time and intensity.
+#' @examples
+#' \donttest{
+#' path <- 'sfi.mzML'
+#' peak <- getmzml(path)
+#' }
 #' @export
 getmzml <- function(path) {
   mzml_file <- mzR::openMSfile(path)
   # read meta data
   tt <- mzR::header(mzml_file)
   # generate retention time vector
-  rt <- rep(tt$retentionTime,tt$peaksCount)
+  rt <- rep(tt$retentionTime, tt$peaksCount)
   # extract peaks
   peaks <- mzR::peaks(mzml_file)
-  peak <- do.call(rbind,peaks)
-  peak <- cbind(peak,rt)
+  peak <- do.call(rbind, peaks)
+  peak <- cbind(peak, rt)
   return(peak)
 }
 #' Cluster and Pair m/z and Retention Time Features
@@ -28,6 +38,10 @@ getmzml <- function(path) {
 #' @param refmz Optional numeric vector of reference m/z values for alignment. Default is NULL.
 #'
 #' @return A data frame containing paired m/z and retention time values with their differences.
+#' @examples
+#' data(sfi)
+#' peak <- find_2d_peaks(mz=sfi$mz,rt=sfi$rt,intensity=sfi$intensity)
+#' peaklist <- getsff(peak$mz, peak$rt)
 #' @export
 getsff <- function(mz,
                    rt,
@@ -118,6 +132,10 @@ getsff <- function(mz,
 #' @param qcseq Integer vector. QC sequence indicating which samples are QC. Default is c(1, 1, 0, 1, 1, 0, 1, 1, 0).
 #'
 #' @return Numeric value representing the optimal retention time window.
+#' @examples
+#' data(sfi)
+#' peak <- find_2d_peaks(mz=sfi$mz,rt=sfi$rt,intensity=sfi$intensity)
+#' peaklist <- getwindow(peak$mz, peak$rt)
 #' @export
 getwindow <- function(mz,
                       rt,
@@ -174,6 +192,10 @@ getwindow <- function(mz,
 #' @param max_iter Integer. Maximum number of binary search iterations. Default is 100.
 #'
 #' @return Optimized delta retention time (idelta).
+#' @examples
+#' data(sfi)
+#' peak <- find_2d_peaks(mz=sfi$mz,rt=sfi$rt,intensity=sfi$intensity)
+#' peaklist2 <- getidelta(peak$mz, peak$rt,qcmz=195.0876,qcrt=74,window=632,idelta=90)
 #' @export
 getidelta <- function(mz,
                       rt,
@@ -296,6 +318,10 @@ getidelta <- function(mz,
 #' @param wupper Numeric. Upper bound for window determination. Default is 650.
 #'
 #' @return A numeric vector containing the optimal window and delta retention time.
+#' @examples
+#' data(sfi)
+#' peak <- find_2d_peaks(mz=sfi$mz,rt=sfi$rt,intensity=sfi$intensity)
+#' peaklist <- getqc(peak$mz, peak$rt, ,deltart=10)
 #' @export
 getqc <- function(mz,
                   rt,
@@ -446,6 +472,10 @@ getqc <- function(mz,
 #' @param minn Integer. Minimum number of QC samples required. Default is 6.
 #'
 #' @return A data frame containing QC information after alignment and filtering.
+#' @examples
+#' data(sfi)
+#' peak <- find_2d_peaks(mz=sfi$mz,rt=sfi$rt,intensity=sfi$intensity)
+#' peaklist <- getqcdf(peak$mz, peak$rt, peak$intensity,idelta=92.25,windows=632.11,minn=6,deltart=10)
 #' @export
 getqcdf <- function(mz,
                     rt,
@@ -567,6 +597,10 @@ getqcdf <- function(mz,
 #' @param n Integer. Number of samples for delta optimization. Default is 160.
 #'
 #' @return A data frame containing the aligned and filtered Quality Control Matrix.
+#' @examples
+#' data(sfi)
+#' peak <- find_2d_peaks(mz=sfi$mz,rt=sfi$rt,intensity=sfi$intensity)
+#' peaklist <- getsfm(peak$mz, peak$rt, peak$intensity,idelta=92,windows=632,minn=6,n=158,deltart=10)
 #' @export
 getsfm <- function(mz,
                    rt,
@@ -775,6 +809,9 @@ getsfm <- function(mz,
 #' @param rt_bins Numeric. retention time bins. Default 100.
 #'
 #' @return A data frame containing the aligned and filtered Quality Control Matrix.
+#' @examples
+#' data(sfi)
+#' peak <- find_2d_peaks(mz=sfi$mz,rt=sfi$rt,intensity=sfi$intensity)
 #' @export
 find_2d_peaks <- function(mz,
                           rt,

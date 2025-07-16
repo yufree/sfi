@@ -41,3 +41,8 @@ A data frame containing QC information after alignment and filtering.
 \description{
 This function generates a QC data frame by aligning QC and matrix samples and filtering based on criteria.
 }
+\examples{
+data(sfi)
+peak <- find_2d_peaks(mz=sfi$mz,rt=sfi$rt,intensity=sfi$intensity)
+peaklist <- getqcdf(peak$mz, peak$rt, peak$intensity,idelta=92.25,windows=632.11,minn=6,deltart=10)
+}

@@ -10,7 +10,7 @@ NULL
 #' @param path path of SFI mzML file.
 #' @return A matrix containing m/z, retention time and intensity.
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' path <- 'sfi.mzML'
 #' peak <- getmzml(path)
 #' }

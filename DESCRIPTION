@@ -9,7 +9,7 @@ Authors@R: person(given = "Miao", family = "YU",
 Description: Data analysis for Single File Injections(SFIs) ode LC-MS analysis. In SFIs mode, pooled samples are initially injected to serve as reference peaks for subsequent analyses. Repeated injections of individual samples are then performed at fixed time intervals using isocratic elution. This package provides the functions to analysis data from SFIs mode including peak picking and peak reassignment.
 URL: https://github.com/yufree/sfi
 BugReports: https://github.com/yufree/sfi/issues/new
-License: MIT
+License: MIT + file LICENSE
 Depends: 
     R (>= 4.5.0)
 LinkingTo: 

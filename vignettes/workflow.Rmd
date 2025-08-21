@@ -20,7 +20,11 @@ library(sfi)
 
 ## Introduction
 
-The `sfi` package provides features extraction tools for single file injections(sfi) mode Gas/liquid chromatography-mass spectrometry (GC/LC-MS) data. The SFI technique enables the analysis of numerous samples (e.g., up to 1000 per day) by acquiring data from multiple injections within a single analytical run, significantly reducing the time compared to traditional serial LC-MS injections.
+The `sfi` package provides features extraction/alignment tools for single file injections(sfi) mode Gas/liquid chromatography-mass spectrometry (GC/LC-MS) data. The SFI technique enables the analysis of numerous samples (e.g., up to 1000 per day) by acquiring data from multiple injections within a single analytical run, significantly reducing the time compared to traditional serial LC-MS injections. 
+
+The input of `sfi` package could be a single mzML file, which contains the interleaved data from all injected samples. Feature table from mzML file by other feature extraction tools such as `xcms` can also be used as input and the output will be a feature table compatible with regular metabolomics/non-target analysis. Such a feature table can be used for downstream analysis, such as statistical analysis and machine learning. The core function of `sfi` package is designed to handle sfi feature table and recover peaks back to individual samples. Currently, no bioconductor package is available to analysis such high throughput data. 
+
+We also provide a simple local maxim peak picking algorithm for sfi raw data analysis as regular feature extraction tools such as `xcms` package were designed for single injection files and need to perform feature alignment across multiple files. This is not suitable for sfi data, where all samples are injected in a single file. However, `xcms` package could still serve as a feature extraction tool for sfi data, but it is still need `sfi` package to handle the feature table and recover peaks back to individual samples. We depend `mzR` package to read single mzML file and `data.table` package to handle large data. 
 
 ## Experimental Desgin
 
@@ -46,6 +50,8 @@ peak <- getmzml(path)
 ```
 
 ### Feature extraction
+
+The `find_2d_peaks()` function will perform peak picking on the mzML file. The input is the mz, rt and intensity of the peaks. The output is a data frame containing the peak information.
 
 ```{r}
 # load demo data

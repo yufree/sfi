@@ -14,9 +14,9 @@ struct Grid2D {
          int rt_b, double rt_mn, double rt_mx,
          const NumericVector& mz_vals,
          const NumericVector& rt_vals)
-    : mz_bins(mz_b), mz_min(mz_mn), mz_max(mz_mx),
-      rt_bins(rt_b), rt_min(rt_mn), rt_max(rt_mx),
-      mz_values(mz_vals), rt_values(rt_vals) {
+    : mz_values(mz_vals), rt_values(rt_vals),
+      mz_min(mz_mn), mz_max(mz_mx), rt_min(rt_mn), rt_max(rt_mx),
+      mz_bins(mz_b), rt_bins(rt_b) {
     cells.resize(mz_bins, std::vector<std::vector<int>>(rt_bins));
   }
 

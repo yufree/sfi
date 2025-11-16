@@ -6,3 +6,4 @@
 
 * Fix warning for C++ code
 * Remove sfi.Rproj from git
+* Change demo data with smaller size

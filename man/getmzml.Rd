@@ -16,8 +16,10 @@ A matrix containing m/z, retention time and intensity.
 Read mzML File and Extract m/z, Retention Time, and Intensity
 }
 \examples{
-\dontrun{
-path <- 'sfi.mzML'
-peak <- getmzml(path)
-}
+# Load demo data
+data(sfi)
+head(sfi)
+# In practice, you would use a real mzML file path:
+# peak <- getmzml("path/to/your/file.mzML")
+# The function returns a matrix with m/z, retention time, and intensity columns
 }

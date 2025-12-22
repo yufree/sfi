@@ -168,75 +168,105 @@ DataFrame find_2d_peaks_c(NumericVector mz,
                           double snr_threshold = 3.0,
                           int mz_bins = 100,
                           int rt_bins = 100) {
-  int n = mz.length();
+    int n = mz.length();
 
-  double mz_min = *std::min_element(mz.begin(), mz.end());
-  double mz_max = *std::max_element(mz.begin(), mz.end());
-  double rt_min = *std::min_element(rt.begin(), rt.end());
-  double rt_max = *std::max_element(rt.begin(), rt.end());
+    double mz_min = *std::min_element(mz.begin(), mz.end());
+    double mz_max = *std::max_element(mz.begin(), mz.end());
+    double rt_min = *std::min_element(rt.begin(), rt.end());
+    double rt_max = *std::max_element(rt.begin(), rt.end());
 
-  Grid2D grid(mz_bins, mz_min, mz_max, rt_bins, rt_min, rt_max, mz, rt);
-  for (int i = 0; i < n; ++i) {
-    grid.add_point(i, mz[i], rt[i]);
-  }
+    Grid2D grid(mz_bins, mz_min, mz_max, rt_bins, rt_min, rt_max, mz, rt);
+    for (int i = 0; i < n; ++i) {
+        grid.add_point(i, mz[i], rt[i]);
+    }
+    
+    // --- HINT 3 START ---
+    // Pre-filtering step to create a list of candidate peak indices.
+    
+    std::vector<int> candidate_indices;
+    candidate_indices.reserve(n / 2); // Pre-allocate some memory
 
-  std::vector<int> indices(n);
-  std::iota(indices.begin(), indices.end(), 0);
-  std::sort(indices.begin(), indices.end(),
-            [&intensity](int i1, int i2) {
-              return intensity[i1] > intensity[i2];
-            });
+    for (int i = 0; i < n; ++i) {
+        // Use a small window to check only the immediate neighborhood
+        double pre_filter_mz_window = mz[i] * mz_ppm * 1e-6;
 
-  std::vector<double> result_mz;
-  std::vector<double> result_rt;
-  std::vector<double> result_intensity;
-  std::vector<bool> checked(n, false);
+        std::vector<int> nearby_points = grid.get_nearby_points(mz[i], rt[i], pre_filter_mz_window, rt_window); // false is default
+        
+        bool is_potential_peak = true;
+        for (int neighbor_idx : nearby_points) {
+            // If any neighbor is more intense, this point cannot be a peak.
+            if (intensity[neighbor_idx] > intensity[i]) {
+                is_potential_peak = false;
+                break;
+            }
+        }
 
-  for (int i = 0; i < n; ++i) {
-    int idx = indices[i];
-    if (checked[idx]) continue;
-
-    double current_mz = mz[idx];
-    double current_rt = rt[idx];
-    double current_intensity = intensity[idx];
-
-    double mz_window = current_mz * mz_ppm * 1e-6;
-    double mz_window_1x = mz_window;
-    double mz_window_2x = 2 * mz_window;
-    double rt_window_1x = rt_window;
-    double rt_window_2x = 2 * rt_window;
-
-    std::vector<int> nearby_points_2x = grid.get_nearby_points(current_mz, current_rt,
-                                                               mz_window_1x, rt_window_1x,
-                                                               true);  // 使用2x窗口
-
-    double noise_mean = compute_noise_2d(nearby_points_2x, intensity, current_mz, current_rt,
-                                         mz_window_2x, mz_window_1x, rt_window_2x, rt_window_1x,
-                                         mz, rt, rt_min, rt_max);
-
-    if (current_intensity < snr_threshold * noise_mean) continue;
-
-    std::vector<int> nearby_points_1x = grid.get_nearby_points(current_mz, current_rt,
-                                                               mz_window_1x, rt_window_1x,
-                                                               false);  // 使用1x窗口
+        if (is_potential_peak) {
+            candidate_indices.push_back(i);
+        }
+    }
+    // --- HINT 3 END ---
 
 
-    bool is_peak = check_if_peak_2d(nearby_points_1x, intensity, current_intensity,
-                                    mz, rt, current_mz, current_rt,
-                                    mz_window_1x, rt_window_1x,
-                                    rt_min, rt_max);
-    for (int j : nearby_points_2x) {
-      checked[j] = true;
+    // Sort the smaller list of candidates, not all points
+    std::sort(candidate_indices.begin(), candidate_indices.end(),
+              [&intensity](int i1, int i2) {
+                  return intensity[i1] > intensity[i2];
+              });
+
+    std::vector<double> result_mz;
+    std::vector<double> result_rt;
+    std::vector<double> result_intensity;
+    std::vector<bool> checked(n, false);
+
+    // --- HINT 3 (Change) ---
+    // Loop over the filtered `candidate_indices` instead of all original indices
+    for (int idx : candidate_indices) {
+        if (checked[idx]) continue;
+
+        double current_mz = mz[idx];
+        double current_rt = rt[idx];
+        double current_intensity = intensity[idx];
+
+        double mz_window = current_mz * mz_ppm * 1e-6;
+        double mz_window_1x = mz_window;
+        double mz_window_2x = 2 * mz_window;
+        double rt_window_1x = rt_window;
+        double rt_window_2x = 2 * rt_window;
+
+        std::vector<int> nearby_points_2x = grid.get_nearby_points(current_mz, current_rt,
+                                                                   mz_window_1x, rt_window_1x,
+                                                                   true);
+
+        double noise_mean = compute_noise_2d(nearby_points_2x, intensity, current_mz, current_rt,
+                                             mz_window_2x, mz_window_1x, rt_window_2x, rt_window_1x,
+                                             mz, rt, rt_min, rt_max);
+
+        if (current_intensity < snr_threshold * noise_mean) continue;
+
+        std::vector<int> nearby_points_1x = grid.get_nearby_points(current_mz, current_rt,
+                                                                   mz_window_1x, rt_window_1x,
+                                                                   false);
+
+
+        bool is_peak = check_if_peak_2d(nearby_points_1x, intensity, current_intensity,
+                                        mz, rt, current_mz, current_rt,
+                                        mz_window_1x, rt_window_1x,
+                                        rt_min, rt_max);
+        
+        // This part is crucial: we still mark points from the original `checked` vector
+        for (int j : nearby_points_2x) {
+            checked[j] = true;
+        }
+
+        if (is_peak) {
+            result_mz.push_back(current_mz);
+            result_rt.push_back(current_rt);
+            result_intensity.push_back(current_intensity);
+        }
     }
 
-    if (is_peak) {
-      result_mz.push_back(current_mz);
-      result_rt.push_back(current_rt);
-      result_intensity.push_back(current_intensity);
-    }
-  }
-
-  return DataFrame::create(Named("mz") = result_mz,
-                           Named("rt") = result_rt,
-                           Named("intensity") = result_intensity);
+    return DataFrame::create(Named("mz") = result_mz,
+                             Named("rt") = result_rt,
+                             Named("intensity") = result_intensity);
 }

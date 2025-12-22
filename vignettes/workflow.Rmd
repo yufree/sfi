@@ -117,7 +117,9 @@ rt <- peaklist$rt
 intensity <- peaklist$intensity
 windows <- ndf[1]
 idelta <- ndf[2]
-ndf <- getsfm(mz,rt,intensity,idelta=idelta,windows=windows,n=158,deltart = 10,minn = 6)
+ndf <- getsfm(mz, rt, intensity,
+              idelta = idelta, windows = windows,
+              n = 158, deltart = 10, minn = 6)
 ```
 
 ```{r}

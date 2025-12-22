@@ -10,10 +10,12 @@ NULL
 #' @param path path of SFI mzML file.
 #' @return A matrix containing m/z, retention time and intensity.
 #' @examples
-#' \dontrun{
-#' path <- 'sfi.mzML'
-#' peak <- getmzml(path)
-#' }
+#' # Load demo data
+#' data(sfi)
+#' head(sfi)
+#' # In practice, you would use a real mzML file path:
+#' # peak <- getmzml("path/to/your/file.mzML")
+#' # The function returns a matrix with m/z, retention time, and intensity columns
 #' @export
 getmzml <- function(path) {
   mzml_file <- mzR::openMSfile(path)
@@ -48,17 +50,32 @@ getsff <- function(mz,
                    ppm = 5,
                    minn = 2,
                    refmz = NULL) {
-  # Calculate Manhattan distance matrix for m/z values
-  dis <- proxy::dist(mz, method = "manhattan")
-
-  # Perform hierarchical clustering
-  fit <- stats::hclust(dis)
-
-  # Cut the dendrogram into clusters based on the specified height
-  mzcluster <- stats::cutree(fit, h = 0.001 * ppm)
+  # Fast replacement for hclust
+  if (length(mz) < 2) {
+    return(data.frame())
+  }
+  ord <- order(mz)
+  mz_sorted <- mz[ord]
+  
+  group_ids_sorted <- integer(length(mz))
+  group_id <- 1
+  group_ids_sorted[1] <- group_id
+  
+  if (length(mz) > 1) {
+    for (i in 2:length(mz)) {
+      if ((mz_sorted[i] - mz_sorted[i-1]) * 1e6 / mz_sorted[i-1] > ppm) {
+        group_id <- group_id + 1
+      }
+      group_ids_sorted[i] <- group_id
+    }
+  }
+  
+  # Create mzcluster vector in original order
+  mzcluster <- integer(length(mz))
+  mzcluster[ord] <- group_ids_sorted
 
   # Identify clusters with at least 'minn' members
-  valid_clusters <- names(which(table(mzcluster) > minn))
+  valid_clusters <- names(which(table(mzcluster) >= minn))
   idx <- mzcluster %in% as.numeric(valid_clusters)
 
   # Filter m/z, rt, and cluster assignments
@@ -80,20 +97,18 @@ getsff <- function(mz,
     # Extract m/z and rt for the current cluster
     bin <- data.frame(mz = mz[mzcluster == cluster_id], rt = rt[mzcluster == cluster_id])
 
-    # Calculate Manhattan distance for retention times within the cluster
-    rtd <- proxy::dist(bin$rt, method = "manhattan")
-
-    # Extract lower triangle indices
-    lower_indices <- which(lower.tri(as.matrix(rtd)), arr.ind = TRUE)
+    # Use combn to get all pairs of indices
+    if (nrow(bin) < 2) return(NULL)
+    pairs <- utils::combn(nrow(bin), 2)
 
     # Pair retention times and m/z values
-    rt1 <- bin$rt[lower_indices[, 1]]
-    rt2 <- bin$rt[lower_indices[, 2]]
-    mz1 <- bin$mz[lower_indices[, 1]]
-    mz2 <- bin$mz[lower_indices[, 2]]
+    rt1 <- bin$rt[pairs[1,]]
+    rt2 <- bin$rt[pairs[2,]]
+    mz1 <- bin$mz[pairs[1,]]
+    mz2 <- bin$mz[pairs[2,]]
 
     # Calculate differences
-    pmr <- as.numeric(rtd)
+    pmr <- abs(rt1 - rt2)
     pmd <- abs(mz1 - mz2)
 
     # Apply ppm tolerance filter
@@ -170,7 +185,7 @@ getwindow <- function(mz,
     window <- rtcx
   }
 
-  message(paste("Window is", window))
+  message("Window is ", window)
   return(window)
 }
 
@@ -294,7 +309,7 @@ getidelta <- function(mz,
     stop("Failed to optimize idelta.")
   }
 
-  message(paste("Delta retention time is", optimized_idelta))
+  message("Delta retention time is ", optimized_idelta)
   return(optimized_idelta)
 }
 
@@ -706,8 +721,8 @@ getsfm <- function(mz,
   # Print summary statistics
   zx <- length(unique(dfmt2$idxq))
   xn <- length(unique(qc$idxq))
-  message(paste(zx, "peaks found in all blank samples"))
-  message(paste(xn, "peaks found in at least", minn, "QC samples"))
+  message(zx, " peaks found in all blank samples")
+  message(xn, " peaks found in at least ", minn, " QC samples")
 
   # Extract sample and matrix peaks after the cutoff
   rts <- rt[rt >= recut]
@@ -781,16 +796,16 @@ getsfm <- function(mz,
   xxx <- length(unique(paste(mdf$mtmz, mdf$mtrt)))
 
   # Print summary statistics
-  message(paste(length(mzs), 'sample peaks found'))
-  message(paste(nrow(ndf), "aligned QC peaks found"))
-  message(paste("Recover", (nrow(ndf) - nn) / length(mzs), "peaks"))
-  message(paste(nrow(mdf), "aligned matrix peaks found"))
-  message(paste("Recover", (nrow(mdf) - nnn) / length(mzs), "peaks"))
+  message(length(mzs), " sample peaks found")
+  message(nrow(ndf), " aligned QC peaks found")
+  message("Recover ", (nrow(ndf) - nn) / length(mzs), " peaks")
+  message(nrow(mdf), " aligned matrix peaks found")
+  message("Recover ", (nrow(mdf) - nnn) / length(mzs), " peaks")
 
-  message(paste(xx, "peaks found in samples"))
-  message(paste(xxx, "matrix peaks found in samples"))
-  message(paste(nn, "isomer peaks found in samples"))
-  message(paste(nnn, "isomer matrix peaks found in samples"))
+  message(xx, " peaks found in samples")
+  message(xxx, " matrix peaks found in samples")
+  message(nn, " isomer peaks found in samples")
+  message(nnn, " isomer matrix peaks found in samples")
 
   return(ndf)
 }
@@ -819,13 +834,37 @@ find_2d_peaks <- function(mz,
                           ppm = 5,
                           deltart = 5,
                           snr = 3.0,
-                          mz_bins = 50000,
-                          rt_bins = 100) {
+                          mz_bins = NULL,
+                          rt_bins = NULL) {
   if (!is.numeric(mz) || !is.numeric(rt) || !is.numeric(intensity)) {
     stop("All inputs must be numeric vectors")
   }
   if (length(mz) != length(rt) || length(mz) != length(intensity)) {
     stop("All input vectors must have the same length")
+  }
+
+  if (length(mz) == 0) {
+    return(data.frame(mz=numeric(), rt=numeric(), intensity=numeric()))
+  }
+  
+  if (is.null(mz_bins)) {
+    max_mz <- max(mz)
+    desired_mz_bin_width <- max_mz * ppm * 1e-6
+    mz_range <- max(mz) - min(mz)
+    if (desired_mz_bin_width > 0 && mz_range > 0) {
+      mz_bins <- ceiling(mz_range / desired_mz_bin_width)
+    } else {
+      mz_bins <- 1
+    }
+  }
+  
+  if (is.null(rt_bins)) {
+    rt_range <- max(rt) - min(rt)
+    if (deltart > 0 && rt_range > 0) {
+      rt_bins <- ceiling(rt_range / deltart)
+    } else {
+      rt_bins <- 1
+    }
   }
 
   find_2d_peaks_c(

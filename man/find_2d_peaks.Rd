@@ -11,8 +11,8 @@ find_2d_peaks(
   ppm = 5,
   deltart = 5,
   snr = 3,
-  mz_bins = 50000,
-  rt_bins = 100
+  mz_bins = NULL,
+  rt_bins = NULL
 )
 }
 \arguments{

@@ -2,9 +2,15 @@
 % Please edit documentation in R/sfi.R
 \name{getidelta}
 \alias{getidelta}
+\alias{getidelta.sfi_peaks}
+\alias{getidelta.default}
 \title{Optimize Delta Retention Time}
 \usage{
-getidelta(
+getidelta(mz, rt, ...)
+
+\method{getidelta}{sfi_peaks}(mz, rt = NULL, ...)
+
+\method{getidelta}{default}(
   mz,
   rt,
   qcmz,
@@ -16,13 +22,16 @@ getidelta(
   window = 600,
   n = 160,
   tol = 0.03,
-  max_iter = 100
+  max_iter = 100,
+  ...
 )
 }
 \arguments{
-\item{mz}{Numeric vector of m/z values.}
+\item{mz}{Numeric vector of m/z values or an object of class `sfi_peaks`.}
 
 \item{rt}{Numeric vector of retention times.}
+
+\item{...}{Additional arguments passed to methods.}
 
 \item{qcmz}{Numeric vector of QC m/z values.}
 
@@ -50,8 +59,15 @@ Optimized delta retention time (idelta).
 \description{
 This function optimizes the delta retention time (idelta) using a binary search approach.
 }
+\section{Methods (by class)}{
+\itemize{
+\item \code{getidelta(sfi_peaks)}: Method for sfi_peaks object
+
+\item \code{getidelta(default)}: Default method for vectors
+
+}}
 \examples{
 data(sfi)
 peak <- find_2d_peaks(mz=sfi$mz,rt=sfi$rt,intensity=sfi$intensity)
-peaklist2 <- getidelta(peak$mz, peak$rt,qcmz=195.0876,qcrt=74,window=632,idelta=90)
+delta_opt <- getidelta(peak$mz, peak$rt,qcmz=195.0876,qcrt=74,window=632,idelta=90)
 }

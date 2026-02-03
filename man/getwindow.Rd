@@ -2,22 +2,31 @@
 % Please edit documentation in R/sfi.R
 \name{getwindow}
 \alias{getwindow}
+\alias{getwindow.sfi_peaks}
+\alias{getwindow.default}
 \title{Determine Optimal Retention Time Window}
 \usage{
-getwindow(
+getwindow(mz, rt, ...)
+
+\method{getwindow}{sfi_peaks}(mz, rt = NULL, ...)
+
+\method{getwindow}{default}(
   mz,
   rt,
   lower = 620,
   upper = 650,
   ppm = 5,
   minn = 1,
-  qcseq = c(1, 1, 0, 1, 1, 0, 1, 1, 0)
+  qcseq = c(1, 1, 0, 1, 1, 0, 1, 1, 0),
+  ...
 )
 }
 \arguments{
-\item{mz}{Numeric vector of m/z values.}
+\item{mz}{Numeric vector of m/z values or an object of class `sfi_peaks`.}
 
 \item{rt}{Numeric vector of retention times.}
+
+\item{...}{Additional arguments passed to methods.}
 
 \item{lower}{Numeric. Lower bound for the retention time window. Default is 620.}
 
@@ -35,8 +44,15 @@ Numeric value representing the optimal retention time window.
 \description{
 This function calculates the optimal retention time window based on QC sequences and m/z/rt data.
 }
+\section{Methods (by class)}{
+\itemize{
+\item \code{getwindow(sfi_peaks)}: Method for sfi_peaks object
+
+\item \code{getwindow(default)}: Default method for vectors
+
+}}
 \examples{
 data(sfi)
 peak <- find_2d_peaks(mz=sfi$mz,rt=sfi$rt,intensity=sfi$intensity)
-peaklist <- getwindow(peak$mz, peak$rt)
+window_opt <- getwindow(peak$mz, peak$rt)
 }

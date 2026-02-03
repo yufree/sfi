@@ -1,7 +1,7 @@
 Package: sfi
 Type: Package
 Title: Data analysis for Single File Injections (SFIs) mode LC-MS analysis
-Version: 0.99.2
+Version: 0.99.3
 Authors@R: person(given = "Miao", family = "YU",
         role = c("aut", "cre"), 
         email = "yufreecas@gmail.com",
@@ -22,9 +22,13 @@ Imports:
     rmarkdown
 Suggests: 
     knitr,
-    data.table
+    data.table,
+    BiocStyle,
+    SummarizedExperiment,
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
 VignetteBuilder: knitr
 biocViews: MassSpectrometry, Metabolomics, FeatureExtraction
 Encoding: UTF-8
 RoxygenNote: 7.3.3
-LazyData: true
+LazyData: false

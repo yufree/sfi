@@ -139,25 +139,26 @@ observeEvent(input$run_analysis, {
 
     # --- 4. Parameter Optimization (Optional) ---
     if (input$optimize_params && input$resolution_mode == "high") {
-      analysis_message(paste0("Step 3/5: Optimizing parameters with getqc(), using initial guesses window=", windows_val, " and idelta=", idelta_val, "...\n"))
+      analysis_message(paste0("Step 3/5: Optimizing parameters with get_sfi_params(), using initial guesses window=", windows_val, " and idelta=", idelta_val, "...\n"))
       sfmsub <- peaklist[peaklist$intensity > input$getqc_intensity_threshold, ]
+      # Preserve class for method dispatch
+      class(sfmsub) <- c("sfi_peaks", "data.frame")
 
       if (nrow(sfmsub) == 0) {
         stop(paste("No peaks found above the intensity threshold of", input$getqc_intensity_threshold, "for parameter optimization. Try a lower threshold."))
       }
 
-      optimized_params <- getqc(
-        mz = sfmsub$mz,
-        rt = sfmsub$rt,
-        intensity = sfmsub$intensity,
+      optimized_params <- get_sfi_params(
+        sfmsub,
         idelta = idelta_val,
         window = windows_val,
         qcseq = qc_seq_vector,
         n = input$n_samples,
         deltart = input$deltart
       )
-      windows_val <- optimized_params[1]
-      idelta_val <- optimized_params[2]
+      # optimized_params is now a named vector c(window = ..., idelta = ...)
+      windows_val <- optimized_params["window"]
+      idelta_val <- optimized_params["idelta"]
       analysis_message(paste0("Step 3/5: Parameters optimized. Using new window = ", round(windows_val, 2), " and idelta = ", round(idelta_val, 2), "\n"))
     } else if (input$resolution_mode == "low" || !input$optimize_params) {
        analysis_message("Step 3/5: Using manually set parameters.\n")
@@ -166,9 +167,7 @@ observeEvent(input$run_analysis, {
     # --- 5. Align features ---
     analysis_message("Step 4/5: Aligning features with getsfm()...\n")
     sfi_aligned <- getsfm(
-      mz = peaklist$mz,
-      rt = peaklist$rt,
-      intensity = peaklist$intensity,
+      peaklist,
       idelta = idelta_val,
       windows = windows_val,
       qcseq = qc_seq_vector,

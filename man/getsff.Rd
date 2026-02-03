@@ -2,14 +2,22 @@
 % Please edit documentation in R/sfi.R
 \name{getsff}
 \alias{getsff}
+\alias{getsff.sfi_peaks}
+\alias{getsff.default}
 \title{Cluster and Pair m/z and Retention Time Features}
 \usage{
-getsff(mz, rt, ppm = 5, minn = 2, refmz = NULL)
+getsff(mz, rt, ...)
+
+\method{getsff}{sfi_peaks}(mz, rt = NULL, ...)
+
+\method{getsff}{default}(mz, rt, ppm = 5, minn = 2, refmz = NULL, ...)
 }
 \arguments{
-\item{mz}{Numeric vector of m/z values.}
+\item{mz}{Numeric vector of m/z values or an object of class `sfi_peaks`.}
 
 \item{rt}{Numeric vector of retention times corresponding to m/z values.}
+
+\item{...}{Additional arguments passed to methods.}
 
 \item{ppm}{Numeric. Parts per million tolerance for m/z matching. Default is 5.}
 
@@ -18,13 +26,28 @@ getsff(mz, rt, ppm = 5, minn = 2, refmz = NULL)
 \item{refmz}{Optional numeric vector of reference m/z values for alignment. Default is NULL.}
 }
 \value{
-A data frame containing paired m/z and retention time values with their differences.
+A data frame containing paired m/z and retention time values with their differences:
+\itemize{
+  \item mz1: m/z of the first feature in the pair.
+  \item rt1: retention time of the first feature in the pair.
+  \item mz2: m/z of the second feature in the pair.
+  \item rt2: retention time of the second feature in the pair.
+  \item pmr: absolute difference in retention time (Pair Mass Retention).
+  \item pmd: absolute difference in m/z (Pair Mass Difference).
+}
 }
 \description{
 This function clusters m/z values based on Manhattan distance and pairs features within clusters.
 }
+\section{Methods (by class)}{
+\itemize{
+\item \code{getsff(sfi_peaks)}: Method for sfi_peaks object
+
+\item \code{getsff(default)}: Default method for vectors
+
+}}
 \examples{
 data(sfi)
 peak <- find_2d_peaks(mz=sfi$mz,rt=sfi$rt,intensity=sfi$intensity)
-peaklist <- getsff(peak$mz, peak$rt)
+sff_features <- getsff(peak$mz, peak$rt)
 }

@@ -1,6 +1,9 @@
 ---
 title: "sfi workflow"
-output: rmarkdown::html_vignette
+output:
+  BiocStyle::html_document:
+    toc: true
+    toc_float: true
 vignette: >
   %\VignetteIndexEntry{sfi workflow}
   %\VignetteEngine{knitr::rmarkdown}
@@ -26,6 +29,14 @@ The input of `sfi` package could be a single mzML file, which contains the inter
 
 We also provide a simple local maxim peak picking algorithm for sfi raw data analysis as regular feature extraction tools such as `xcms` package were designed for single injection files and need to perform feature alignment across multiple files. This is not suitable for sfi data, where all samples are injected in a single file. However, `xcms` package could still serve as a feature extraction tool for sfi data, but it is still need `sfi` package to handle the feature table and recover peaks back to individual samples. We depend `mzR` package to read single mzML file and `data.table` package to handle large data. 
 
+## Installation
+
+```{r eval=FALSE}
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+BiocManager::install("sfi")
+```
+
 ## Experimental Desgin
 
 The SFI method (see demo figure) operates by:
@@ -36,7 +47,9 @@ The SFI method (see demo figure) operates by:
 
 - This process generates a single, continuous data file containing the interleaved data from all injected samples.
 
-![DemoFigure](https://github.com/yufree/presentation/blob/gh-pages/figure/SFI.png?raw=true)
+```{r fig.cap="Schematic representation of the Single File Injection (SFI) workflow. (Top) A pooled Quality Control (QC) sample is injected multiple times at the beginning of the run to establish a robust reference for peak alignment. Individual study samples are then injected sequentially at short, fixed time intervals (e.g., every 1 min) into a continuous isocratic flow. This results in a single, long mzML file containing interleaved chromatograms from all samples, which `sfi` separates and aligns. (Bottom) Demonstration of peak recovery algorithms for SFI data using fixed time intervals", out.width="80%"}
+knitr::include_graphics("https://github.com/yufree/presentation/blob/gh-pages/figure/SFI.png?raw=true")
+```
 
 ## Basic Usage
 
@@ -65,9 +78,6 @@ peaklist <-  find_2d_peaks(mz=sfi$mz,rt=sfi$rt,intensity=sfi$intensity)
 The `getsfm()` function will extract sample features from one injections file.
 
 ```{r}
-mz <- peaklist$mz
-rt <- peaklist$rt
-intensity <- peaklist$intensity
 # injection interval
 idelta <- 92
 # time windows for a full separation
@@ -78,8 +88,8 @@ n <- 100
 deltart <- 10
 # min peak number in pooled qc samples 
 minn <- 6
-# align peaks from sfi
-ndf <- getsfm(mz,rt,intensity,idelta=idelta,windows=windows,n=100,deltart = 10,minn = 6)
+# align peaks from sfi. Note: peaklist is an sfi_peaks object, so we can pass it directly.
+ndf <- getsfm(peaklist, idelta=idelta, windows=windows, n=100, deltart=10, minn=6)
 # generate feature list
 ndf$peakid <- paste0(round(ndf$qcmz,4),'@',round(ndf$qcrt))
 nndf <- ndf[,c('sampleidx','intensity','peakid')]
@@ -96,33 +106,91 @@ Save feature list as csv file.
 fwrite(feature,'featurelist.csv')
 ```
 
-### Advanved Usage
+## Using the Results
+
+The primary output of the `sfi` workflow is a feature table (matrix) where rows represent mass spectral features (unique m/z and retention time pairs) and columns represent individual samples. The values in the cells are the integrated intensities of these features.
+
+This feature table allows you to answer biological or chemical questions about your samples:
+- **Metabolomics/Lipidomics Profiling:** Identify which compounds change in abundance between different experimental groups (e.g., disease vs. control).
+- **Quality Control:** Assess the stability of the instrument over the run by checking the intensity of internal standards or features in QC samples.
+- **Sample Classification:** Use the feature profiles to cluster samples or build predictive models.
+
+The "Downstream Analysis" section below demonstrates how to format this data for use with other R/Bioconductor tools that specialize in these statistical tasks.
+
+## Downstream Analysis
+
+For integration with other Bioconductor packages, it is recommended to convert the feature table into a `SummarizedExperiment` object. This class is the standard container for rectangular data in Bioconductor and facilitates interoperability with tools like `DESeq2`, `limma`, or `SummarizedExperiment`-based metabolomics workflows.
+
+```{r}
+if (requireNamespace("SummarizedExperiment", quietly = TRUE)) {
+  library(SummarizedExperiment)
+  
+  # Prepare the count matrix (features x samples)
+  # Ensure the matrix contains only numeric intensity values
+  # feature is a data.table from the previous step
+  counts <- as.matrix(feature[, -1, with = FALSE])
+  rownames(counts) <- feature$peakid
+  
+  # Create sample metadata (colData)
+  # In a real study, this would include group information, time points, etc.
+  # Here we create dummy metadata for demonstration
+  colData <- DataFrame(
+    SampleID = colnames(counts),
+    Group = rep(c("Control", "Treatment"), length.out = ncol(counts)),
+    row.names = colnames(counts)
+  )
+  
+  # Create feature metadata (rowData)
+  # Extract m/z and retention time from the peak ID
+  peak_info <- do.call(rbind, strsplit(rownames(counts), "@"))
+  rowData <- DataFrame(
+    mz = as.numeric(peak_info[, 1]),
+    rt = as.numeric(peak_info[, 2]),
+    row.names = rownames(counts)
+  )
+  
+  # Construct the SummarizedExperiment object
+  se <- SummarizedExperiment(
+    assays = list(counts = counts),
+    colData = colData,
+    rowData = rowData
+  )
+  
+  # Inspect the object
+  print(se)
+  
+  # Example: Access data
+  # assay(se, "counts")[1:5, 1:3]
+  # colData(se)
+}
+```
+
+### Advanced Usage
 
 In real data, you might find the input window for separation and injection interval are not accurate due to the lag in sample injection process. It's suggested to filter high intensity peaks and use `getqc` to find the accurate value for accurate instrumental window for separation and injection interval.
 
 ```{r}
 # get windows and delta time
 sfmsub <- peaklist[peaklist$intensity>1e4,]
-mz <- sfmsub$mz
-rt <- sfmsub$rt
+class(sfmsub) <- c("sfi_peaks", "data.frame") # Preserve class for method dispatch
 # get windows and delta time
-ndf <- getqc(mz,rt,n=158,deltart = 5)
+sfi_params <- get_sfi_params(sfmsub, n=158, deltart = 5)
 ```
 
 Then you can use those parameters for all data.
 
 ```{r}
-mz <- peaklist$mz
-rt <- peaklist$rt
-intensity <- peaklist$intensity
-windows <- ndf[1]
-idelta <- ndf[2]
-ndf <- getsfm(mz, rt, intensity,
+windows <- sfi_params['window']
+idelta <- sfi_params['idelta']
+ndf <- getsfm(peaklist,
               idelta = idelta, windows = windows,
               n = 158, deltart = 10, minn = 6)
 ```
 
+## Conclusion
+
+The `sfi` package streamlines the complex task of processing Single File Injection data, converting a continuous stream of interleaved mass spectral data into a structured format ready for analysis. By correctly identifying and aligning features from rapid, sequential injections, it unlocks the throughput potential of SFI-MS for large-scale metabolomics and screening studies.
+
 ```{r}
 sessionInfo()
 ```
-

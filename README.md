@@ -14,16 +14,19 @@ The SFI method (see demo figure) operates by:
 
 - This process generates a single, continuous data file containing the interleaved data from all injected samples.
 
-![DemoFigure](https://github.com/yufree/presentation/blob/gh-pages/figure/SFI.png?raw=true)
+![DemoFigure](https://raw.githubusercontent.com/yufree/presentation/refs/heads/gh-pages/figure/SFI.png)
 
 ## Installation
 
-```
-# Install from CRAN (when available)
-install.packages("sfi")
+```r
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+# Install from Bioconductor (when available)
+BiocManager::install("sfi")
 
 # Or install the development version from GitHub
-remotes::install_github("yufree/sfi")
+# remotes::install_github("yufree/sfi")
 ```
 
 ## Basic Usage

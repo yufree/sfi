@@ -10,7 +10,7 @@ getmzml(path)
 \item{path}{path of SFI mzML file.}
 }
 \value{
-A matrix containing m/z, retention time and intensity.
+A data frame containing m/z, retention time and intensity.
 }
 \description{
 Read mzML File and Extract m/z, Retention Time, and Intensity
@@ -21,5 +21,5 @@ data(sfi)
 head(sfi)
 # In practice, you would use a real mzML file path:
 # peak <- getmzml("path/to/your/file.mzML")
-# The function returns a matrix with m/z, retention time, and intensity columns
+# The function returns a data frame with m/z, retention time, and intensity columns
 }

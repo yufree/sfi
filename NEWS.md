@@ -23,12 +23,17 @@
 * Renamed `getqc()` to `get_sfi_params()` to better reflect its purpose. It now returns a named vector `c(window, idelta)` instead of an unnamed vector.
 * Renamed `getqcdf()` to `get_qc_features()` for clarity.
 * `getmzml()` now returns a `data.frame` with named columns (`mz`, `intensity`, `rt`) instead of a matrix.
-* `getsfm()` (Sample Feature Matrix) and `get_qc_features()` now set informative row names corresponding to the sample injection index.
-* Expanded vignette with "Using the Results" and "Downstream Analysis" sections, demonstrating integration with `SummarizedExperiment`.
-* Detailed documentation for return values and column definitions for `getsfm`, `getsff`, and `get_qc_features`.
+* `get_qc_features()` now sets informative row names corresponding to the sample injection index.
+* Detailed documentation for return values and column definitions for `getsff`, and `get_qc_features`.
 * Updated README installation instructions for Bioconductor.
 * Added a comprehensive `testthat` test suite.
 * Updated `DESCRIPTION` to set `LazyData: false` per Bioconductor guidelines.
-* Added `SummarizedExperiment` to `Suggests`.
 * Updated `find_2d_peaks` to return an object with class c("sfi_peaks", "data.frame"). All the related functions have been updated.
+
+# sfi 0.99.4
+
+* `getsfm()` now returns a `SummarizedExperiment` object instead of a `data.frame`, with intensities in the `assay` slot and feature metadata in `rowData`.
+* Expanded vignette with "Using the Results" and "Downstream Analysis" sections, demonstrating the `SummarizedExperiment` output.
+* Added `SummarizedExperiment`, `S4Vectors`, and `methods` to `Imports`.
+* Updated Shiny app and documentation to handle `SummarizedExperiment` from `getsfm()`.
 

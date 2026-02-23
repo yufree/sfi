@@ -1,7 +1,7 @@
 Package: sfi
 Type: Package
 Title: Data analysis for Single File Injections (SFIs) mode LC-MS analysis
-Version: 0.99.3
+Version: 0.99.4
 Authors@R: person(given = "Miao", family = "YU",
         role = c("aut", "cre"), 
         email = "yufreecas@gmail.com",
@@ -19,12 +19,16 @@ Imports:
     enviGCMS,
     stats,
     mzR,
-    rmarkdown
+    rmarkdown,
+    methods,
+    SummarizedExperiment,
+    S4Vectors
 Suggests: 
     knitr,
     data.table,
     BiocStyle,
-    SummarizedExperiment,
+    ggplot2,
+    MsCoreUtils,
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
 VignetteBuilder: knitr

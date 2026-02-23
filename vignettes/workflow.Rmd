@@ -89,12 +89,9 @@ deltart <- 10
 # min peak number in pooled qc samples 
 minn <- 6
 # align peaks from sfi. Note: peaklist is an sfi_peaks object, so we can pass it directly.
-ndf <- getsfm(peaklist, idelta=idelta, windows=windows, n=100, deltart=10, minn=6)
-# generate feature list
-ndf$peakid <- paste0(round(ndf$qcmz,4),'@',round(ndf$qcrt))
-nndf <- ndf[,c('sampleidx','intensity','peakid')]
-library(data.table)
-feature <- dcast(setDT(nndf), ... ~ sampleidx, value.var = "intensity",fun.aggregate = sum)
+se <- getsfm(peaklist, idelta=idelta, windows=windows, n=100, deltart=10, minn=6)
+# The output is a SummarizedExperiment object
+se
 ```
 
 ### Save feature list
@@ -102,8 +99,12 @@ feature <- dcast(setDT(nndf), ... ~ sampleidx, value.var = "intensity",fun.aggre
 Save feature list as csv file.
 
 ```{r eval=FALSE}
+# extract feature matrix with row metadata
+library(SummarizedExperiment)
+feature_table <- cbind(as.data.frame(rowData(se)), as.data.frame(assay(se)))
 # save feature as csv file
-fwrite(feature,'featurelist.csv')
+library(data.table)
+fwrite(feature_table, 'featurelist.csv')
 ```
 
 ## Using the Results
@@ -119,51 +120,72 @@ The "Downstream Analysis" section below demonstrates how to format this data for
 
 ## Downstream Analysis
 
-For integration with other Bioconductor packages, it is recommended to convert the feature table into a `SummarizedExperiment` object. This class is the standard container for rectangular data in Bioconductor and facilitates interoperability with tools like `DESeq2`, `limma`, or `SummarizedExperiment`-based metabolomics workflows.
+For integration with other Bioconductor packages, the `sfi` workflow already provides results as a `SummarizedExperiment` object. This class is the standard container for rectangular data in Bioconductor and facilitates interoperability with tools like `DESeq2`, `limma`, or `SummarizedExperiment`-based metabolomics workflows.
 
-```{r}
-if (requireNamespace("SummarizedExperiment", quietly = TRUE)) {
+### Interoperability and Visualization
+
+Once the data is in a `SummarizedExperiment` object, we can leverage the rich Bioconductor ecosystem for visualization and quality control.
+
+```{r downstream-viz, message=FALSE}
+if (requireNamespace("SummarizedExperiment", quietly = TRUE) && 
+    requireNamespace("ggplot2", quietly = TRUE)) {
   library(SummarizedExperiment)
+  library(ggplot2)
   
-  # Prepare the count matrix (features x samples)
-  # Ensure the matrix contains only numeric intensity values
-  # feature is a data.table from the previous step
-  counts <- as.matrix(feature[, -1, with = FALSE])
-  rownames(counts) <- feature$peakid
+  # Basic data access
+  intensities <- assay(se, "intensities")
   
-  # Create sample metadata (colData)
-  # In a real study, this would include group information, time points, etc.
-  # Here we create dummy metadata for demonstration
-  colData <- DataFrame(
-    SampleID = colnames(counts),
-    Group = rep(c("Control", "Treatment"), length.out = ncol(counts)),
-    row.names = colnames(counts)
+  # Visualization: Distribution of intensities across samples
+  # Reshape for ggplot2
+  plot_df <- data.frame(
+    Intensity = as.vector(intensities),
+    Sample = rep(colnames(intensities), each = nrow(intensities))
   )
+  # Filter out zeros for log transformation
+  plot_df <- plot_df[plot_df$Intensity > 0, ]
   
-  # Create feature metadata (rowData)
-  # Extract m/z and retention time from the peak ID
-  peak_info <- do.call(rbind, strsplit(rownames(counts), "@"))
-  rowData <- DataFrame(
-    mz = as.numeric(peak_info[, 1]),
-    rt = as.numeric(peak_info[, 2]),
-    row.names = rownames(counts)
-  )
-  
-  # Construct the SummarizedExperiment object
-  se <- SummarizedExperiment(
-    assays = list(counts = counts),
-    colData = colData,
-    rowData = rowData
-  )
-  
-  # Inspect the object
-  print(se)
-  
-  # Example: Access data
-  # assay(se, "counts")[1:5, 1:3]
-  # colData(se)
+  ggplot(plot_df, aes(x = Sample, y = Intensity, fill = Sample)) +
+    geom_boxplot() +
+    scale_y_log10() +
+    theme_minimal() +
+    theme(axis.text.x = element_blank()) +
+    labs(title = "Intensity Distribution Across Samples",
+         y = "Log10 Intensity",
+         x = "Sample Index") +
+    guides(fill = "none")
 }
 ```
+
+### Normalization and Transformation
+
+Typical metabolomics workflows require data normalization and transformation. We can use `MsCoreUtils` for these tasks while maintaining the metadata within our object.
+
+```{r downstream-norm, message=FALSE}
+if (requireNamespace("SummarizedExperiment", quietly = TRUE) && 
+    requireNamespace("MsCoreUtils", quietly = TRUE)) {
+  library(SummarizedExperiment)
+  library(MsCoreUtils)
+  
+  # Log2 transformation
+  # We can create a new assay in the SummarizedExperiment
+  assay(se, "log2") <- log2(assay(se, "intensities") + 1)
+  
+  # Quantile normalization
+  # assay(se, "norm") <- MsCoreUtils::normalizeMethods()[["quantile"]](assay(se, "log2"))
+  
+  # Example: Summarize feature metadata
+  cat("Total number of features:", nrow(se), "\n")
+  cat("M/Z range:", paste(range(rowData(se)$mz), collapse = " - "), "\n")
+  
+  # Accessing sample metadata for group-wise analysis
+  colData(se)$Group <- rep(c("Control", "Treatment"), length.out = ncol(se))
+  
+  # You can now pass this object to other tools like limma or DESeq2
+  # print(se)
+}
+```
+
+## Advanced Usage
 
 ### Advanced Usage
 
@@ -182,7 +204,7 @@ Then you can use those parameters for all data.
 ```{r}
 windows <- sfi_params['window']
 idelta <- sfi_params['idelta']
-ndf <- getsfm(peaklist,
+se <- getsfm(peaklist,
               idelta = idelta, windows = windows,
               n = 158, deltart = 10, minn = 6)
 ```

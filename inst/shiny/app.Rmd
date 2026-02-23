@@ -179,11 +179,10 @@ observeEvent(input$run_analysis, {
 
     # --- 6. Generate feature table ---
     analysis_message("Step 5/5: Generating final feature table...\n")
-    sfi_aligned$peakid <- paste0(round(sfi_aligned$qcmz, 4), '@', round(sfi_aligned$qcrt))
-    feature_table <- dcast(setDT(sfi_aligned[, c('sampleidx', 'intensity', 'peakid')]),
-                           peakid ~ sampleidx,
-                           value.var = "intensity",
-                           fun.aggregate = sum)
+    
+    # Extract data from SummarizedExperiment
+    library(SummarizedExperiment)
+    feature_table <- cbind(as.data.frame(rowData(sfi_aligned)), as.data.frame(assay(sfi_aligned)))
 
     # Store the result
     feature_table_data(feature_table)

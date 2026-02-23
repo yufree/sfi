@@ -32,19 +32,17 @@ test_that("getsfm returns correctly formatted SFM", {
                 idelta = idelta, windows = windows, n = n, 
                 deltart = deltart, minn = minn)
   
-  expect_s3_class(sfm, "data.frame")
+  expect_s4_class(sfm, "SummarizedExperiment")
   
-  # Check expected columns (as defined in documentation update)
-  expected_cols <- c("mz", "rt", "srt", "sampleidx", "intensity", 
-                     "qcmz", "qcrt", "shiftrt", "ppmshift")
-  # Note: getsfm might return extra columns, but should contain these.
-  # Based on code: c('mz', 'rt', 'srt', 'sampleidx', 'intensity', 'qcmz', 'qcrt', 'shiftrt', 'ppmshift')
-  # Checking intersection to allow for potential extras if any (though usually strict is better).
-  expect_true(all(expected_cols %in% colnames(sfm)))
+  # Check assay
+  expect_true("intensities" %in% SummarizedExperiment::assayNames(sfm))
+  expect_equal(ncol(sfm), n)
+  
+  # Check rowData
+  expect_true(all(c("mz", "rt") %in% colnames(SummarizedExperiment::rowData(sfm))))
   
   # Check types
-  expect_type(sfm$mz, "double")
-  expect_true(is.numeric(sfm$sampleidx)) # Accepts integer or double
+  expect_type(SummarizedExperiment::assay(sfm), "double")
 })
 
 test_that("get_sfi_params returns expected window and delta", {

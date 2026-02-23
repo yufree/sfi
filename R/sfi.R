@@ -1,5 +1,6 @@
 #' @useDynLib sfi, .registration = TRUE
 #' @importFrom Rcpp evalCpp
+#' @import methods
 NULL
 #' Demo sfi data
 #' @docType data
@@ -756,12 +757,16 @@ getsfm <- function(mz, rt, intensity, ...) {
 }
 
 #' @describeIn getsfm Method for sfi_peaks object
+#' @importFrom SummarizedExperiment SummarizedExperiment
+#' @importFrom S4Vectors DataFrame
 #' @export
 getsfm.sfi_peaks <- function(mz, rt = NULL, intensity = NULL, ...) {
   getsfm.default(mz$mz, mz$rt, mz$intensity, ...)
 }
 
 #' @describeIn getsfm Default method for vectors
+#' @importFrom SummarizedExperiment SummarizedExperiment
+#' @importFrom S4Vectors DataFrame
 #' @export
 getsfm.default <- function(mz,
                    rt,
@@ -956,8 +961,53 @@ getsfm.default <- function(mz,
   message(nn, " isomer peaks found in samples")
   message(nnn, " isomer matrix peaks found in samples")
 
-  rownames(ndf) <- make.unique(as.character(ndf$sampleidx))
-  return(ndf)
+  # Internalize wrangling to return SummarizedExperiment
+  ndf$peakid <- paste0(round(ndf$qcmz, 4), "@", round(ndf$qcrt))
+  
+  # Unique features for rowData
+  u_peaks <- ndf[!duplicated(ndf$peakid), c("peakid", "qcmz", "qcrt")]
+  # Sort to ensure consistent order
+  u_peaks <- u_peaks[order(u_peaks$qcmz, u_peaks$qcrt), ]
+  rownames(u_peaks) <- u_peaks$peakid
+  
+  # Create intensity matrix (features x samples)
+  # Use all samples from 1 to n
+  mat <- as.matrix(stats::xtabs(intensity ~ peakid + sampleidx, data = ndf))
+  
+  # Ensure all peaks and all samples are represented
+  full_mat <- matrix(0, nrow = nrow(u_peaks), ncol = n)
+  rownames(full_mat) <- u_peaks$peakid
+  colnames(full_mat) <- paste0("S", 1:n)
+  
+  # Match existing data into full matrix
+  common_peaks <- intersect(u_peaks$peakid, rownames(mat))
+  common_samples <- intersect(as.character(1:n), colnames(mat))
+  
+  if (length(common_peaks) > 0 && length(common_samples) > 0) {
+    full_mat[common_peaks, paste0("S", common_samples)] <- mat[common_peaks, common_samples]
+  }
+  
+  # Create rowData
+  row_data <- S4Vectors::DataFrame(
+    mz = u_peaks$qcmz,
+    rt = u_peaks$qcrt,
+    row.names = u_peaks$peakid
+  )
+  
+  # Create colData
+  col_data <- S4Vectors::DataFrame(
+    sampleidx = 1:n,
+    row.names = colnames(full_mat)
+  )
+  
+  # Create SummarizedExperiment
+  se <- SummarizedExperiment::SummarizedExperiment(
+    assays = list(intensities = full_mat),
+    rowData = row_data,
+    colData = col_data
+  )
+  
+  return(se)
 }
 
 #' Feature extraction core function

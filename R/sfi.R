@@ -1,5 +1,6 @@
 #' @useDynLib sfi, .registration = TRUE
 #' @importFrom Rcpp evalCpp
+#' @import methods
 NULL
 #' Demo sfi data
 #' @docType data
@@ -8,12 +9,14 @@ NULL
 "sfi"
 #' Read mzML File and Extract m/z, Retention Time, and Intensity
 #' @param path path of SFI mzML file.
-#' @return A matrix containing m/z, retention time and intensity.
+#' @return A data frame containing m/z, retention time and intensity.
 #' @examples
-#' \dontrun{
-#' path <- 'sfi.mzML'
-#' peak <- getmzml(path)
-#' }
+#' # Load demo data
+#' data(sfi)
+#' head(sfi)
+#' # In practice, you would use a real mzML file path:
+#' # peak <- getmzml("path/to/your/file.mzML")
+#' # The function returns a data frame with m/z, retention time, and intensity columns
 #' @export
 getmzml <- function(path) {
   mzml_file <- mzR::openMSfile(path)
@@ -25,6 +28,8 @@ getmzml <- function(path) {
   peaks <- mzR::peaks(mzml_file)
   peak <- do.call(rbind, peaks)
   peak <- cbind(peak, rt)
+  peak <- as.data.frame(peak)
+  colnames(peak) <- c("mz", "intensity", "rt")
   return(peak)
 }
 #' Cluster and Pair m/z and Retention Time Features
@@ -37,28 +42,69 @@ getmzml <- function(path) {
 #' @param minn Integer. Minimum number of features in a cluster to be retained. Default is 2.
 #' @param refmz Optional numeric vector of reference m/z values for alignment. Default is NULL.
 #'
-#' @return A data frame containing paired m/z and retention time values with their differences.
+#' @return A data frame containing paired m/z and retention time values with their differences:
+#' \itemize{
+#'   \item mz1: m/z of the first feature in the pair.
+#'   \item rt1: retention time of the first feature in the pair.
+#'   \item mz2: m/z of the second feature in the pair.
+#'   \item rt2: retention time of the second feature in the pair.
+#'   \item pmr: absolute difference in retention time (Pair Mass Retention).
+#'   \item pmd: absolute difference in m/z (Pair Mass Difference).
+#' }
 #' @examples
 #' data(sfi)
 #' peak <- find_2d_peaks(mz=sfi$mz,rt=sfi$rt,intensity=sfi$intensity)
-#' peaklist <- getsff(peak$mz, peak$rt)
+#' sff_features <- getsff(peak$mz, peak$rt)
+#' @param mz Numeric vector of m/z values or an object of class `sfi_peaks`.
+#' @param rt Numeric vector of retention times corresponding to m/z values.
+#' @param ... Additional arguments passed to methods.
 #' @export
-getsff <- function(mz,
+getsff <- function(mz, rt, ...) {
+  UseMethod("getsff")
+}
+
+#' @describeIn getsff Method for sfi_peaks object
+#' @export
+getsff.sfi_peaks <- function(mz, rt = NULL, ...) {
+  getsff.default(mz$mz, mz$rt, ...)
+}
+
+#' @describeIn getsff Default method for vectors
+#' @export
+getsff.default <- function(mz,
                    rt,
                    ppm = 5,
                    minn = 2,
-                   refmz = NULL) {
-  # Calculate Manhattan distance matrix for m/z values
-  dis <- proxy::dist(mz, method = "manhattan")
-
-  # Perform hierarchical clustering
-  fit <- stats::hclust(dis)
-
-  # Cut the dendrogram into clusters based on the specified height
-  mzcluster <- stats::cutree(fit, h = 0.001 * ppm)
+                   refmz = NULL, ...) {
+  if (!is.unsorted(rt)) {
+    warning("The input retention time vector appears to be sorted. This suggests raw data is being used instead of peak-picked data. Please run find_2d_peaks() first.")
+  }
+  # Fast replacement for hclust
+  if (length(mz) < 2) {
+    return(data.frame())
+  }
+  ord <- order(mz)
+  mz_sorted <- mz[ord]
+  
+  group_ids_sorted <- integer(length(mz))
+  group_id <- 1
+  group_ids_sorted[1] <- group_id
+  
+  if (length(mz) > 1) {
+    for (i in 2:length(mz)) {
+      if ((mz_sorted[i] - mz_sorted[i-1]) * 1e6 / mz_sorted[i-1] > ppm) {
+        group_id <- group_id + 1
+      }
+      group_ids_sorted[i] <- group_id
+    }
+  }
+  
+  # Create mzcluster vector in original order
+  mzcluster <- integer(length(mz))
+  mzcluster[ord] <- group_ids_sorted
 
   # Identify clusters with at least 'minn' members
-  valid_clusters <- names(which(table(mzcluster) > minn))
+  valid_clusters <- names(which(table(mzcluster) >= minn))
   idx <- mzcluster %in% as.numeric(valid_clusters)
 
   # Filter m/z, rt, and cluster assignments
@@ -80,20 +126,18 @@ getsff <- function(mz,
     # Extract m/z and rt for the current cluster
     bin <- data.frame(mz = mz[mzcluster == cluster_id], rt = rt[mzcluster == cluster_id])
 
-    # Calculate Manhattan distance for retention times within the cluster
-    rtd <- proxy::dist(bin$rt, method = "manhattan")
-
-    # Extract lower triangle indices
-    lower_indices <- which(lower.tri(as.matrix(rtd)), arr.ind = TRUE)
+    # Use combn to get all pairs of indices
+    if (nrow(bin) < 2) return(NULL)
+    pairs <- utils::combn(nrow(bin), 2)
 
     # Pair retention times and m/z values
-    rt1 <- bin$rt[lower_indices[, 1]]
-    rt2 <- bin$rt[lower_indices[, 2]]
-    mz1 <- bin$mz[lower_indices[, 1]]
-    mz2 <- bin$mz[lower_indices[, 2]]
+    rt1 <- bin$rt[pairs[1,]]
+    rt2 <- bin$rt[pairs[2,]]
+    mz1 <- bin$mz[pairs[1,]]
+    mz2 <- bin$mz[pairs[2,]]
 
     # Calculate differences
-    pmr <- as.numeric(rtd)
+    pmr <- abs(rt1 - rt2)
     pmd <- abs(mz1 - mz2)
 
     # Apply ppm tolerance filter
@@ -135,15 +179,33 @@ getsff <- function(mz,
 #' @examples
 #' data(sfi)
 #' peak <- find_2d_peaks(mz=sfi$mz,rt=sfi$rt,intensity=sfi$intensity)
-#' peaklist <- getwindow(peak$mz, peak$rt)
+#' window_opt <- getwindow(peak$mz, peak$rt)
+#' @param mz Numeric vector of m/z values or an object of class `sfi_peaks`.
+#' @param rt Numeric vector of retention times.
+#' @param ... Additional arguments passed to methods.
 #' @export
-getwindow <- function(mz,
+getwindow <- function(mz, rt, ...) {
+  UseMethod("getwindow")
+}
+
+#' @describeIn getwindow Method for sfi_peaks object
+#' @export
+getwindow.sfi_peaks <- function(mz, rt = NULL, ...) {
+  getwindow.default(mz$mz, mz$rt, ...)
+}
+
+#' @describeIn getwindow Default method for vectors
+#' @export
+getwindow.default <- function(mz,
                       rt,
                       lower = 620,
                       upper = 650,
                       ppm = 5,
                       minn = 1,
-                      qcseq = c(1, 1, 0, 1, 1, 0, 1, 1, 0)) {
+                      qcseq = c(1, 1, 0, 1, 1, 0, 1, 1, 0), ...) {
+  if (!is.unsorted(rt)) {
+    warning("The input retention time vector appears to be sorted. This suggests raw data is being used instead of peak-picked data. Please run find_2d_peaks() first.")
+  }
   # Calculate the cutoff retention time based on QC sequence length and upper window
   recut <- length(qcseq) * upper
 
@@ -170,7 +232,7 @@ getwindow <- function(mz,
     window <- rtcx
   }
 
-  message(paste("Window is", window))
+  message("Window is ", window)
   return(window)
 }
 
@@ -195,9 +257,24 @@ getwindow <- function(mz,
 #' @examples
 #' data(sfi)
 #' peak <- find_2d_peaks(mz=sfi$mz,rt=sfi$rt,intensity=sfi$intensity)
-#' peaklist2 <- getidelta(peak$mz, peak$rt,qcmz=195.0876,qcrt=74,window=632,idelta=90)
+#' delta_opt <- getidelta(peak$mz, peak$rt,qcmz=195.0876,qcrt=74,window=632,idelta=90)
+#' @param mz Numeric vector of m/z values or an object of class `sfi_peaks`.
+#' @param rt Numeric vector of retention times.
+#' @param ... Additional arguments passed to methods.
 #' @export
-getidelta <- function(mz,
+getidelta <- function(mz, rt, ...) {
+  UseMethod("getidelta")
+}
+
+#' @describeIn getidelta Method for sfi_peaks object
+#' @export
+getidelta.sfi_peaks <- function(mz, rt = NULL, ...) {
+  getidelta.default(mz$mz, mz$rt, ...)
+}
+
+#' @describeIn getidelta Default method for vectors
+#' @export
+getidelta.default <- function(mz,
                       rt,
                       qcmz,
                       qcrt,
@@ -208,7 +285,10 @@ getidelta <- function(mz,
                       window = 600,
                       n = 160,
                       tol = 0.03,
-                      max_iter = 100) {
+                      max_iter = 100, ...) {
+  if (!is.unsorted(rt)) {
+    warning("The input retention time vector appears to be sorted. This suggests raw data is being used instead of peak-picked data. Please run find_2d_peaks() first.")
+  }
   # Align QC m/z with sample m/z values
   merge2 <- enviGCMS::getalign(qcmz, mz, ppm = ppm)
   qcmz_aligned <- qcmz[unique(merge2$xid)]
@@ -294,7 +374,7 @@ getidelta <- function(mz,
     stop("Failed to optimize idelta.")
   }
 
-  message(paste("Delta retention time is", optimized_idelta))
+  message("Delta retention time is ", optimized_idelta)
   return(optimized_idelta)
 }
 
@@ -317,13 +397,33 @@ getidelta <- function(mz,
 #' @param wlower Numeric. Lower bound for window determination. Default is 620.
 #' @param wupper Numeric. Upper bound for window determination. Default is 650.
 #'
-#' @return A numeric vector containing the optimal window and delta retention time.
+#' @return A named numeric vector containing the optimal window and delta retention time:
+#' \itemize{
+#'   \item window: The optimized retention time window.
+#'   \item idelta: The optimized delta retention time.
+#' }
 #' @examples
 #' data(sfi)
 #' peak <- find_2d_peaks(mz=sfi$mz,rt=sfi$rt,intensity=sfi$intensity)
-#' peaklist <- getqc(peak$mz, peak$rt, ,deltart=10)
+#' sfi_params <- get_sfi_params(peak$mz, peak$rt, peak$intensity, deltart=10)
+#' @param mz Numeric vector of m/z values or an object of class `sfi_peaks`.
+#' @param rt Numeric vector of retention times.
+#' @param intensity Numeric vector of intensities corresponding to m/z and rt values.
+#' @param ... Additional arguments passed to methods.
 #' @export
-getqc <- function(mz,
+get_sfi_params <- function(mz, rt, intensity, ...) {
+  UseMethod("get_sfi_params")
+}
+
+#' @describeIn get_sfi_params Method for sfi_peaks object
+#' @export
+get_sfi_params.sfi_peaks <- function(mz, rt = NULL, intensity = NULL, ...) {
+  get_sfi_params.default(mz$mz, mz$rt, mz$intensity, ...)
+}
+
+#' @describeIn get_sfi_params Default method for vectors
+#' @export
+get_sfi_params.default <- function(mz,
                   rt,
                   intensity,
                   idelta = 60,
@@ -336,7 +436,10 @@ getqc <- function(mz,
                   tol = 0.03,
                   max_iter = 100,
                   wlower = 620,
-                  wupper = 650) {
+                  wupper = 650, ...) {
+  if (!is.unsorted(rt)) {
+    warning("The input retention time vector appears to be sorted. This suggests raw data is being used instead of peak-picked data. Please run find_2d_peaks() first.")
+  }
   # Determine the optimal retention time window
   windows <- getwindow(
     mz = mz,
@@ -454,12 +557,13 @@ getqc <- function(mz,
     max_iter = max_iter
   )
 
-  return(c(windows, optimized_idelta))
+  return(c(window = windows, idelta = optimized_idelta))
 }
 
-#' Generate Quality Control Data Frame
+#' Generate Quality Control Feature List
 #'
-#' This function generates a QC data frame by aligning QC and matrix samples and filtering based on criteria.
+#' This function generates a list of features found in Quality Control (QC) samples by aligning QC and matrix samples
+#' and filtering based on detection frequency criteria.
 #'
 #' @param mz Numeric vector of m/z values.
 #' @param rt Numeric vector of retention times.
@@ -471,13 +575,38 @@ getqc <- function(mz,
 #' @param ppm Numeric. Parts per million tolerance for m/z matching. Default is 5.
 #' @param minn Integer. Minimum number of QC samples required. Default is 6.
 #'
-#' @return A data frame containing QC information after alignment and filtering.
+#' @return A data frame containing filtered QC features with the following columns:
+#' \itemize{
+#'   \item mzqc: aligned m/z of the QC feature.
+#'   \item rtqc: aligned retention time of the QC feature.
+#'   \item intensity: intensity of the feature in the specific QC sample.
+#'   \item sampleidx: index of the QC sample injection.
+#'   \item idxq: unique identifier for the QC feature group (mz rt).
+#' }
+#' The row names of the data frame are set to the sample index (injection number), with suffixes to ensure uniqueness.
 #' @examples
 #' data(sfi)
 #' peak <- find_2d_peaks(mz=sfi$mz,rt=sfi$rt,intensity=sfi$intensity)
-#' peaklist <- getqcdf(peak$mz, peak$rt, peak$intensity,idelta=92.25,windows=632.11,minn=6,deltart=10)
+#' qc_features <- get_qc_features(peak$mz, peak$rt, peak$intensity,
+#'                                idelta=92.25,windows=632.11,minn=6,deltart=10)
+#' @param mz Numeric vector of m/z values or an object of class `sfi_peaks`.
+#' @param rt Numeric vector of retention times.
+#' @param intensity Numeric vector of intensities corresponding to m/z and rt values.
+#' @param ... Additional arguments passed to methods.
 #' @export
-getqcdf <- function(mz,
+get_qc_features <- function(mz, rt, intensity, ...) {
+  UseMethod("get_qc_features")
+}
+
+#' @describeIn get_qc_features Method for sfi_peaks object
+#' @export
+get_qc_features.sfi_peaks <- function(mz, rt = NULL, intensity = NULL, ...) {
+  get_qc_features.default(mz$mz, mz$rt, mz$intensity, ...)
+}
+
+#' @describeIn get_qc_features Default method for vectors
+#' @export
+get_qc_features.default <- function(mz,
                     rt,
                     intensity,
                     idelta = 60,
@@ -485,7 +614,10 @@ getqcdf <- function(mz,
                     qcseq = c(1, 1, 0, 1, 1, 0, 1, 1, 0),
                     deltart = 5,
                     ppm = 5,
-                    minn = 6) {
+                    minn = 6, ...) {
+  if (!is.unsorted(rt)) {
+    warning("The input retention time vector appears to be sorted. This suggests raw data is being used instead of peak-picked data. Please run find_2d_peaks() first.")
+  }
   # Calculate the retention time cutoff
   recut <- length(qcseq) * windows
 
@@ -576,14 +708,16 @@ getqcdf <- function(mz,
 
   # Extract QC features that are not aligned with matrix features
   qc <- dfqct2[-re$xid, c('mzqc', 'rtqc', 'intensity', 'sampleidx', 'idxq')]
+  rownames(qc) <- make.unique(as.character(qc$sampleidx))
 
   # Return the QC data frame
   return(qc)
 }
 
-#' Generate Quality Control Matrix (SFM)
+#' Generate Sample Feature Matrix (SFM)
 #'
-#' This function generates a Quality Control Matrix by aligning and filtering sample and matrix peaks.
+#' This function generates a Sample Feature Matrix (SFM) by aligning and filtering sample peaks against QC peaks.
+#' The SFM contains features extracted from individual samples within the single file injection.
 #'
 #' @param mz Numeric vector of m/z values.
 #' @param rt Numeric vector of retention times.
@@ -596,13 +730,45 @@ getqcdf <- function(mz,
 #' @param minn Integer. Minimum number of QC samples required. Default is 1.
 #' @param n Integer. Number of samples for delta optimization. Default is 160.
 #'
-#' @return A data frame containing the aligned and filtered Quality Control Matrix.
+#' @return A data frame containing the aligned and filtered sample features with the following columns:
+#' \itemize{
+#'   \item mz: m/z of the feature in the sample.
+#'   \item rt: retention time of the feature in the sample (global).
+#'   \item srt: relative retention time of the feature within the sample injection window.
+#'   \item sampleidx: index of the sample injection.
+#'   \item intensity: intensity of the feature.
+#'   \item qcmz: m/z of the matching reference QC feature.
+#'   \item qcrt: retention time of the matching reference QC feature.
+#'   \item shiftrt: absolute difference between sample srt and QC reference retention time.
+#'   \item ppmshift: absolute difference in ppm between sample m/z and QC reference m/z.
+#' }
+#' The row names of the data frame are set to the sample index (injection number).
 #' @examples
 #' data(sfi)
 #' peak <- find_2d_peaks(mz=sfi$mz,rt=sfi$rt,intensity=sfi$intensity)
-#' peaklist <- getsfm(peak$mz, peak$rt, peak$intensity,idelta=92,windows=632,minn=6,n=158,deltart=10)
+#' sfm_df <- getsfm(peak$mz, peak$rt, peak$intensity,idelta=92,windows=632,minn=6,n=158,deltart=10)
+#' @param mz Numeric vector of m/z values or an object of class `sfi_peaks`.
+#' @param rt Numeric vector of retention times.
+#' @param intensity Numeric vector of intensities corresponding to m/z and rt values.
+#' @param ... Additional arguments passed to methods.
 #' @export
-getsfm <- function(mz,
+getsfm <- function(mz, rt, intensity, ...) {
+  UseMethod("getsfm")
+}
+
+#' @describeIn getsfm Method for sfi_peaks object
+#' @importFrom SummarizedExperiment SummarizedExperiment
+#' @importFrom S4Vectors DataFrame
+#' @export
+getsfm.sfi_peaks <- function(mz, rt = NULL, intensity = NULL, ...) {
+  getsfm.default(mz$mz, mz$rt, mz$intensity, ...)
+}
+
+#' @describeIn getsfm Default method for vectors
+#' @importFrom SummarizedExperiment SummarizedExperiment
+#' @importFrom S4Vectors DataFrame
+#' @export
+getsfm.default <- function(mz,
                    rt,
                    intensity,
                    idelta = 60,
@@ -611,7 +777,10 @@ getsfm <- function(mz,
                    deltart = 5,
                    ppm = 5,
                    minn = 1,
-                   n = 160) {
+                   n = 160, ...) {
+  if (!is.unsorted(rt)) {
+    warning("The input retention time vector appears to be sorted. This suggests raw data is being used instead of peak-picked data. Please run find_2d_peaks() first.")
+  }
   # Calculate the retention time cutoff
   recut <- length(qcseq) * windows
 
@@ -706,8 +875,8 @@ getsfm <- function(mz,
   # Print summary statistics
   zx <- length(unique(dfmt2$idxq))
   xn <- length(unique(qc$idxq))
-  message(paste(zx, "peaks found in all blank samples"))
-  message(paste(xn, "peaks found in at least", minn, "QC samples"))
+  message(zx, " peaks found in all blank samples")
+  message(xn, " peaks found in at least ", minn, " QC samples")
 
   # Extract sample and matrix peaks after the cutoff
   rts <- rt[rt >= recut]
@@ -737,12 +906,12 @@ getsfm <- function(mz,
     dfi <- dfj
 
     # Align sample with QC
-    merge_qc <- enviGCMS::getalign(mzi,
+    merge_qc <- suppressMessages(enviGCMS::getalign(mzi,
                                    qc$mzqc,
                                    srt,
                                    qc$rtqc,
                                    ppm = ppm,
-                                   deltart = deltart)
+                                   deltart = deltart))
     dfi <- dfi[unique(merge_qc$xid), ]
     dfi$qcmz <- merge_qc$mz2[!duplicated(merge_qc$xid)]
     dfi$qcrt <- merge_qc$rt2[!duplicated(merge_qc$xid)]
@@ -750,12 +919,12 @@ getsfm <- function(mz,
     ndf <- rbind(ndf, dfi)
 
     # Align sample with matrix
-    merge_mtx <- enviGCMS::getalign(mzi,
+    merge_mtx <- suppressMessages(enviGCMS::getalign(mzi,
                                     dfmt2$mzqc,
                                     srt,
                                     dfmt2$rtqc,
                                     ppm = ppm,
-                                    deltart = deltart)
+                                    deltart = deltart))
     dfj <- dfj[unique(merge_mtx$xid), ]
     dfj$mtmz <- merge_mtx$mz2[!duplicated(merge_mtx$xid)]
     dfj$mtrt <- merge_mtx$rt2[!duplicated(merge_mtx$xid)]
@@ -781,18 +950,64 @@ getsfm <- function(mz,
   xxx <- length(unique(paste(mdf$mtmz, mdf$mtrt)))
 
   # Print summary statistics
-  message(paste(length(mzs), 'sample peaks found'))
-  message(paste(nrow(ndf), "aligned QC peaks found"))
-  message(paste("Recover", (nrow(ndf) - nn) / length(mzs), "peaks"))
-  message(paste(nrow(mdf), "aligned matrix peaks found"))
-  message(paste("Recover", (nrow(mdf) - nnn) / length(mzs), "peaks"))
+  message(length(mzs), " sample peaks found")
+  message(nrow(ndf), " aligned QC peaks found")
+  message("Recover ", (nrow(ndf) - nn) / length(mzs), " peaks")
+  message(nrow(mdf), " aligned matrix peaks found")
+  message("Recover ", (nrow(mdf) - nnn) / length(mzs), " peaks")
 
-  message(paste(xx, "peaks found in samples"))
-  message(paste(xxx, "matrix peaks found in samples"))
-  message(paste(nn, "isomer peaks found in samples"))
-  message(paste(nnn, "isomer matrix peaks found in samples"))
+  message(xx, " peaks found in samples")
+  message(xxx, " matrix peaks found in samples")
+  message(nn, " isomer peaks found in samples")
+  message(nnn, " isomer matrix peaks found in samples")
 
-  return(ndf)
+  # Internalize wrangling to return SummarizedExperiment
+  ndf$peakid <- paste0(round(ndf$qcmz, 4), "@", round(ndf$qcrt))
+  
+  # Unique features for rowData
+  u_peaks <- ndf[!duplicated(ndf$peakid), c("peakid", "qcmz", "qcrt")]
+  # Sort to ensure consistent order
+  u_peaks <- u_peaks[order(u_peaks$qcmz, u_peaks$qcrt), ]
+  rownames(u_peaks) <- u_peaks$peakid
+  
+  # Create intensity matrix (features x samples)
+  # Use all samples from 1 to n
+  mat <- as.matrix(stats::xtabs(intensity ~ peakid + sampleidx, data = ndf))
+  
+  # Ensure all peaks and all samples are represented
+  full_mat <- matrix(0, nrow = nrow(u_peaks), ncol = n)
+  rownames(full_mat) <- u_peaks$peakid
+  colnames(full_mat) <- paste0("S", 1:n)
+  
+  # Match existing data into full matrix
+  common_peaks <- intersect(u_peaks$peakid, rownames(mat))
+  common_samples <- intersect(as.character(1:n), colnames(mat))
+  
+  if (length(common_peaks) > 0 && length(common_samples) > 0) {
+    full_mat[common_peaks, paste0("S", common_samples)] <- mat[common_peaks, common_samples]
+  }
+  
+  # Create rowData
+  row_data <- S4Vectors::DataFrame(
+    mz = u_peaks$qcmz,
+    rt = u_peaks$qcrt,
+    row.names = u_peaks$peakid
+  )
+  
+  # Create colData
+  col_data <- S4Vectors::DataFrame(
+    sampleidx = 1:n,
+    row.names = colnames(full_mat)
+  )
+  
+  # Create SummarizedExperiment
+  se <- SummarizedExperiment::SummarizedExperiment(
+    assays = list(intensities = full_mat),
+    rowData = row_data,
+    colData = col_data
+  )
+  
+  return(se)
 }
 
 #' Feature extraction core function
@@ -808,7 +1023,7 @@ getsfm <- function(mz,
 #' @param mz_bins Numeric. m/z bins. Default 50000.
 #' @param rt_bins Numeric. retention time bins. Default 100.
 #'
-#' @return A data frame containing the aligned and filtered Quality Control Matrix.
+#' @return A data frame containing m/z, retention time, and intensity of identified peaks.
 #' @examples
 #' data(sfi)
 #' peak <- find_2d_peaks(mz=sfi$mz,rt=sfi$rt,intensity=sfi$intensity)
@@ -819,8 +1034,8 @@ find_2d_peaks <- function(mz,
                           ppm = 5,
                           deltart = 5,
                           snr = 3.0,
-                          mz_bins = 50000,
-                          rt_bins = 100) {
+                          mz_bins = NULL,
+                          rt_bins = NULL) {
   if (!is.numeric(mz) || !is.numeric(rt) || !is.numeric(intensity)) {
     stop("All inputs must be numeric vectors")
   }
@@ -828,7 +1043,31 @@ find_2d_peaks <- function(mz,
     stop("All input vectors must have the same length")
   }
 
-  find_2d_peaks_c(
+  if (length(mz) == 0) {
+    return(data.frame(mz=numeric(), rt=numeric(), intensity=numeric()))
+  }
+  
+  if (is.null(mz_bins)) {
+    max_mz <- max(mz)
+    desired_mz_bin_width <- max_mz * ppm * 1e-6
+    mz_range <- max(mz) - min(mz)
+    if (desired_mz_bin_width > 0 && mz_range > 0) {
+      mz_bins <- ceiling(mz_range / desired_mz_bin_width)
+    } else {
+      mz_bins <- 1
+    }
+  }
+  
+  if (is.null(rt_bins)) {
+    rt_range <- max(rt) - min(rt)
+    if (deltart > 0 && rt_range > 0) {
+      rt_bins <- ceiling(rt_range / deltart)
+    } else {
+      rt_bins <- 1
+    }
+  }
+
+  result <- find_2d_peaks_c(
     mz,
     rt,
     intensity,
@@ -838,4 +1077,6 @@ find_2d_peaks <- function(mz,
     mz_bins = mz_bins,
     rt_bins = rt_bins
   )
+  class(result) <- c("sfi_peaks", "data.frame")
+  return(result)
 }

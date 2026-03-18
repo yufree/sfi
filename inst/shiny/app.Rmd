@@ -1,0 +1,228 @@
+---
+title: "SFI Data Analysis"
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(shiny)
+library(data.table)
+library(DT)
+library(sfi)
+```
+
+This Shiny app provides a graphical user interface for the `sfi` package. Upload an mzML file and set the parameters to perform feature extraction and alignment for Single File Injection (SFI) data. The workflow follows the steps outlined in the package vignette.
+
+```{r, context="ui"}
+sidebarLayout(
+  sidebarPanel(
+    h4("1. Upload Data"),
+    fileInput("mzml_file", "Upload mzML File", accept = c(".mzML")),
+    
+    h4("2. Set Parameters"),
+    textInput("qcseq", "QC/Blank", "1,1,0,1,1,0,1,1,0"),
+    p(em("Comma-separated list of 1s (QC) and 0s (Blank)."), style = "font-size: 0.9em; color: #666;"),
+
+    numericInput("n_samples", "Number of Samples (n)", 150, min = 1),
+
+    hr(),
+
+    h5("Data Resolution Mode"),
+    radioButtons("resolution_mode", "Select Data Type:",
+                 choices = list("High Resolution" = "high",
+                               "Low Resolution (Unit Mass)" = "low"),
+                 selected = "high"),
+
+    conditionalPanel(
+      condition = "input.resolution_mode == 'low'",
+      numericInput("low_res_deltart", "Delta RT for Low Res", 5, min = 1),
+      numericInput("low_res_snr", "Signal-to-Noise Ratio", 3.0, min = 0.1, step = 0.1),
+      p(em("Low resolution mode aggregates data by integer mass before peak finding."),
+        style = "font-size: 0.9em; color: #666;")
+    ),
+
+    hr(),
+    
+    h5("Alignment Parameters"),
+    checkboxInput("optimize_params", "Auto-optimize Parameters?", value = TRUE),
+
+    conditionalPanel(
+      "input.resolution_mode == 'low'",
+      p(em("Note: Parameter optimization is not available for low resolution data."),
+        style = "font-size: 0.9em; color: #888;")
+    ),
+
+    conditionalPanel(
+      "input.optimize_params == true && input.resolution_mode == 'high'",
+      numericInput("sfi_params_intensity_threshold", "Optimization Intensity Threshold", 1000000, min = 0)
+    ),
+
+    numericInput("idelta", "Interval (idelta)", 92, min = 0, step = 0.01),
+    numericInput("windows", "Window", 632, min = 1),
+    uiOutput("optim_note_ui"),
+    
+    hr(),
+    
+    h5("Advanced Parameters"),
+    numericInput("deltart", "Delta RT for grouping", 10, min = 1),
+    numericInput("minn", "Minimum points for feature", 6, min = 1),
+    numericInput("ppm", "PPM Tolerance (ppm)", 3, min = 0),
+
+    hr(),
+    
+    actionButton("run_analysis", "Run Analysis", icon = icon("play")),
+    br(),
+    br(),
+    h5("Analysis Status"),
+    verbatimTextOutput("analysis_message")
+  ),
+  
+  mainPanel(
+    tabsetPanel(
+      tabPanel("Feature Table", 
+               br(),
+               p("After analysis, the feature table will be displayed below."),
+               downloadButton("download_table", "Download Table (.csv)"),
+               hr(),
+               DTOutput("feature_table")
+      ),
+
+    )
+  )
+)
+```
+
+```{r, context="server"}
+# Reactive values to store results
+feature_table_data <- reactiveVal(NULL)
+analysis_message <- reactiveVal("Ready for analysis.")
+
+observeEvent(input$run_analysis, {
+  req(input$mzml_file)
+  
+  # Reset previous results
+  feature_table_data(NULL)
+  analysis_message("Starting analysis...\n")
+
+  # Show a notification that analysis is running
+  showNotification("Analysis in progress...", duration = NULL, id = "analysis_notification")
+
+  tryCatch({
+    # --- 1. Parse qcseq input ---
+    qc_seq_vector <- as.numeric(trimws(unlist(strsplit(input$qcseq, ","))))
+    if (any(is.na(qc_seq_vector)) || !all(qc_seq_vector %in% c(0, 1))) {
+      stop("Invalid QC/Sample Sequence. Please use a comma-separated list of 1s (QC) and 0s (Sample).")
+    }
+
+    # --- 2. Load mzML data ---
+    analysis_message("Step 1/5: Loading mzML data...\n")
+    mzml_data_val <- getmzml(input$mzml_file$datapath)
+
+
+    # --- 3. Perform peak picking ---
+    if (input$resolution_mode == "low") {
+      analysis_message("Step 2/5: Performing low resolution 2D peak picking...\n")
+      peaklist <- find_peaks_low_res(
+        mz = mzml_data_val[,1],
+        rt = mzml_data_val[,3],
+        intensity = mzml_data_val[,2],
+        deltart = input$low_res_deltart,
+        snr = input$low_res_snr
+      )
+    } else {
+      analysis_message("Step 2/5: Performing high resolution 2D peak picking...\n")
+      peaklist <- find_2d_peaks(mz = mzml_data_val[,1], rt = mzml_data_val[,3], intensity = mzml_data_val[,2])
+    }
+
+    idelta_val <- input$idelta
+    windows_val <- input$windows
+
+    # --- 4. Parameter Optimization (Optional) ---
+    if (input$optimize_params && input$resolution_mode == "high") {
+      analysis_message(paste0("Step 3/5: Optimizing parameters with get_sfi_params(), using initial guesses window=", windows_val, " and idelta=", idelta_val, "...\n"))
+      sfmsub <- peaklist[peaklist$intensity > input$sfi_params_intensity_threshold, ]
+      # Preserve class for method dispatch
+      class(sfmsub) <- c("sfi_peaks", "data.frame")
+
+      if (nrow(sfmsub) == 0) {
+        stop(paste("No peaks found above the intensity threshold of", input$sfi_params_intensity_threshold, "for parameter optimization. Try a lower threshold."))
+      }
+
+      optimized_params <- get_sfi_params(
+        sfmsub,
+        idelta = idelta_val,
+        window = windows_val,
+        qcseq = qc_seq_vector,
+        n = input$n_samples,
+        deltart = input$deltart
+      )
+      # optimized_params is now a named vector c(window = ..., idelta = ...)
+      windows_val <- optimized_params["window"]
+      idelta_val <- optimized_params["idelta"]
+      analysis_message(paste0("Step 3/5: Parameters optimized. Using new window = ", round(windows_val, 2), " and idelta = ", round(idelta_val, 2), "\n"))
+    } else if (input$resolution_mode == "low" || !input$optimize_params) {
+       analysis_message("Step 3/5: Using manually set parameters.\n")
+    }
+
+    # --- 5. Align features ---
+    analysis_message("Step 4/5: Aligning features with getsfm()...\n")
+    sfi_aligned <- getsfm(
+      peaklist,
+      idelta = idelta_val,
+      windows = windows_val,
+      qcseq = qc_seq_vector,
+      n = input$n_samples,
+      deltart = input$deltart,
+      minn = input$minn,
+      ppm = input$ppm
+    )
+
+    # --- 6. Generate feature table ---
+    analysis_message("Step 5/5: Generating final feature table...\n")
+    
+    # Extract data from SummarizedExperiment
+    library(SummarizedExperiment)
+    feature_table <- cbind(as.data.frame(rowData(sfi_aligned)), as.data.frame(assay(sfi_aligned)))
+
+    # Store the result
+    feature_table_data(feature_table)
+    
+    analysis_message("Analysis successful!\n")
+    showNotification("Analysis successful!", type = "message")
+
+  }, error = function(e) {
+    showNotification(paste("An error occurred:", e$message), type = "error", duration = 10)
+    analysis_message(paste("Error:", e$message, "\n"))
+  }, finally = {
+    # Remove the notification
+    removeNotification("analysis_notification")
+  })
+})
+
+# Render the data table
+output$feature_table <- renderDT({
+  req(feature_table_data())
+  datatable(feature_table_data(), options = list(scrollX = TRUE, pageLength = 10, search = list(search = "")))
+})
+
+# Display messages
+output$analysis_message <- renderText({
+  analysis_message()
+})
+
+# Display optimization note
+output$optim_note_ui <- renderUI({
+  if(input$optimize_params && input$resolution_mode == "high") {
+    p(em("The values for interval and window above will be used as initial guesses for the optimization."), style = "font-size: 0.9em; color: #666;")
+  }
+})
+
+# Handle download
+output$download_table <- downloadHandler(
+  filename = function() {
+    paste0("feature_table_", Sys.Date(), ".csv")
+  },
+  content = function(file) {
+    fwrite(feature_table_data(), file)
+  }
+)

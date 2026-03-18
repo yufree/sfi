@@ -11,8 +11,8 @@ find_2d_peaks(
   ppm = 5,
   deltart = 5,
   snr = 3,
-  mz_bins = 50000,
-  rt_bins = 100
+  mz_bins = NULL,
+  rt_bins = NULL
 )
 }
 \arguments{
@@ -33,7 +33,7 @@ find_2d_peaks(
 \item{rt_bins}{Numeric. retention time bins. Default 100.}
 }
 \value{
-A data frame containing the aligned and filtered Quality Control Matrix.
+A data frame containing m/z, retention time, and intensity of identified peaks.
 }
 \description{
 This function finds local max peaks on m/z-retention time 2D plane.

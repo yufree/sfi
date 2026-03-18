@@ -2,9 +2,15 @@
 % Please edit documentation in R/sfi.R
 \name{getsfm}
 \alias{getsfm}
-\title{Generate Quality Control Matrix (SFM)}
+\alias{getsfm.sfi_peaks}
+\alias{getsfm.default}
+\title{Generate Sample Feature Matrix (SFM)}
 \usage{
-getsfm(
+getsfm(mz, rt, intensity, ...)
+
+\method{getsfm}{sfi_peaks}(mz, rt = NULL, intensity = NULL, ...)
+
+\method{getsfm}{default}(
   mz,
   rt,
   intensity,
@@ -14,15 +20,18 @@ getsfm(
   deltart = 5,
   ppm = 5,
   minn = 1,
-  n = 160
+  n = 160,
+  ...
 )
 }
 \arguments{
-\item{mz}{Numeric vector of m/z values.}
+\item{mz}{Numeric vector of m/z values or an object of class `sfi_peaks`.}
 
 \item{rt}{Numeric vector of retention times.}
 
 \item{intensity}{Numeric vector of intensities corresponding to m/z and rt values.}
+
+\item{...}{Additional arguments passed to methods.}
 
 \item{idelta}{Numeric. Initial delta retention time. Default is 60.}
 
@@ -39,13 +48,33 @@ getsfm(
 \item{n}{Integer. Number of samples for delta optimization. Default is 160.}
 }
 \value{
-A data frame containing the aligned and filtered Quality Control Matrix.
+A data frame containing the aligned and filtered sample features with the following columns:
+\itemize{
+  \item mz: m/z of the feature in the sample.
+  \item rt: retention time of the feature in the sample (global).
+  \item srt: relative retention time of the feature within the sample injection window.
+  \item sampleidx: index of the sample injection.
+  \item intensity: intensity of the feature.
+  \item qcmz: m/z of the matching reference QC feature.
+  \item qcrt: retention time of the matching reference QC feature.
+  \item shiftrt: absolute difference between sample srt and QC reference retention time.
+  \item ppmshift: absolute difference in ppm between sample m/z and QC reference m/z.
+}
+The row names of the data frame are set to the sample index (injection number).
 }
 \description{
-This function generates a Quality Control Matrix by aligning and filtering sample and matrix peaks.
+This function generates a Sample Feature Matrix (SFM) by aligning and filtering sample peaks against QC peaks.
+The SFM contains features extracted from individual samples within the single file injection.
 }
+\section{Methods (by class)}{
+\itemize{
+\item \code{getsfm(sfi_peaks)}: Method for sfi_peaks object
+
+\item \code{getsfm(default)}: Default method for vectors
+
+}}
 \examples{
 data(sfi)
 peak <- find_2d_peaks(mz=sfi$mz,rt=sfi$rt,intensity=sfi$intensity)
-peaklist <- getsfm(peak$mz, peak$rt, peak$intensity,idelta=92,windows=632,minn=6,n=158,deltart=10)
+sfm_df <- getsfm(peak$mz, peak$rt, peak$intensity,idelta=92,windows=632,minn=6,n=158,deltart=10)
 }

@@ -54,7 +54,7 @@ sidebarLayout(
 
     conditionalPanel(
       "input.optimize_params == true && input.resolution_mode == 'high'",
-      numericInput("getqc_intensity_threshold", "Optimization Intensity Threshold", 1000000, min = 0)
+      numericInput("sfi_params_intensity_threshold", "Optimization Intensity Threshold", 1000000, min = 0)
     ),
 
     numericInput("idelta", "Interval (idelta)", 92, min = 0, step = 0.01),
@@ -140,12 +140,12 @@ observeEvent(input$run_analysis, {
     # --- 4. Parameter Optimization (Optional) ---
     if (input$optimize_params && input$resolution_mode == "high") {
       analysis_message(paste0("Step 3/5: Optimizing parameters with get_sfi_params(), using initial guesses window=", windows_val, " and idelta=", idelta_val, "...\n"))
-      sfmsub <- peaklist[peaklist$intensity > input$getqc_intensity_threshold, ]
+      sfmsub <- peaklist[peaklist$intensity > input$sfi_params_intensity_threshold, ]
       # Preserve class for method dispatch
       class(sfmsub) <- c("sfi_peaks", "data.frame")
 
       if (nrow(sfmsub) == 0) {
-        stop(paste("No peaks found above the intensity threshold of", input$getqc_intensity_threshold, "for parameter optimization. Try a lower threshold."))
+        stop(paste("No peaks found above the intensity threshold of", input$sfi_params_intensity_threshold, "for parameter optimization. Try a lower threshold."))
       }
 
       optimized_params <- get_sfi_params(

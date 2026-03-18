@@ -189,7 +189,7 @@ if (requireNamespace("SummarizedExperiment", quietly = TRUE) &&
 
 ### Advanced Usage
 
-In real data, you might find the input window for separation and injection interval are not accurate due to the lag in sample injection process. It's suggested to filter high intensity peaks and use `getqc` to find the accurate value for accurate instrumental window for separation and injection interval.
+In real data, you might find the input window for separation and injection interval are not accurate due to the lag in sample injection process. It's suggested to filter high intensity peaks and use `get_sfi_params` to find the accurate value for accurate instrumental window for separation and injection interval.
 
 ```{r}
 # get windows and delta time

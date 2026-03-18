@@ -36,3 +36,8 @@
 * Expanded vignette with "Using the Results" and "Downstream Analysis" sections, demonstrating the `SummarizedExperiment` output.
 * Added `SummarizedExperiment`, `S4Vectors`, and `methods` to `Imports`.
 * Updated Shiny app and documentation to handle `SummarizedExperiment` from `getsfm()`.
+
+# sfi 0.99.5
+
+* vignette updates
+* trigger build

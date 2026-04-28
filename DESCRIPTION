@@ -1,7 +1,7 @@
 Package: sfi
 Type: Package
 Title: Data analysis for Single File Injections (SFIs) mode LC-MS analysis
-Version: 1.0.0
+Version: 1.1.0
 Authors@R: person(given = "Miao", family = "YU",
         role = c("aut", "cre"), 
         email = "yufreecas@gmail.com",

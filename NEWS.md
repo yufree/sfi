@@ -1,3 +1,7 @@
+# sfi 1.1.0
+
+* Replaced the `mzR` dependency with `RaMS` for reading mzML files in `getmzml()`. `RaMS` is a pure-R reader with no system-library dependencies (no netCDF/HDF5), which makes installation lighter and more portable. Output is unchanged: a `data.frame` with `mz`, `intensity`, and `rt` (seconds) columns.
+
 # sfi 0.99.0
 
 * Initial BioC submission.

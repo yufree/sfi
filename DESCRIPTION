@@ -18,7 +18,7 @@ Imports:
     Rcpp,
     enviGCMS,
     stats,
-    mzR,
+    RaMS,
     rmarkdown,
     methods,
     SummarizedExperiment,

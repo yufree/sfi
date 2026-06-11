@@ -19,17 +19,14 @@ NULL
 #' # The function returns a data frame with m/z, retention time, and intensity columns
 #' @export
 getmzml <- function(path) {
-  mzml_file <- mzR::openMSfile(path)
-  # read meta data
-  tt <- mzR::header(mzml_file)
-  # generate retention time vector
-  rt <- rep(tt$retentionTime, tt$peaksCount)
-  # extract peaks
-  peaks <- mzR::peaks(mzml_file)
-  peak <- do.call(rbind, peaks)
-  peak <- cbind(peak, rt)
-  peak <- as.data.frame(peak)
-  colnames(peak) <- c("mz", "intensity", "rt")
+  # read MS1 data with RaMS (pure-R mzML reader, no system dependencies)
+  msdata <- RaMS::grabMSdata(path, grab_what = "MS1", verbosity = 0L)$MS1
+  peak <- data.frame(
+    mz = msdata$mz,
+    intensity = msdata$int,
+    # RaMS reports retention time in minutes; convert to seconds
+    rt = msdata$rt * 60
+  )
   return(peak)
 }
 #' Cluster and Pair m/z and Retention Time Features
